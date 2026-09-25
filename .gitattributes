@@ -1,1 +1,14 @@
+# Двоичные файлы: веб-интерфейс загрузки GitHub перекодирует их в UTF-8 и портит.
+# .docx и .xlsx заливать только через git push.
+*.xlsx binary
+*.docx binary
+*.pdf  binary
+*.zip  binary
+*.rar  binary
 
+# Текст комплекта — с переводом строки LF, чтобы правки не выглядели
+# переписыванием всего файла целиком.
+*.html text eol=lf
+*.js   text eol=lf
+*.css  text eol=lf
+*.md   text eol=lf
