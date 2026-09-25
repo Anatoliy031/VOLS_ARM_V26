@@ -1,0 +1,84 @@
+@page{
+  size:A4; margin:19mm 16mm 20mm 20mm;
+  @bottom-left{
+    content:"Рабочее место ППО ВОЛС · Руководство пользователя · версия 3.5.11";
+    font-family:"DejaVu Sans",sans-serif; font-size:7.4pt; color:#777;
+    border-top:.5pt solid #C9D6E2; width:100%; padding-top:2mm; vertical-align:top;
+  }
+  @bottom-right{
+    content:counter(page); font-family:"DejaVu Sans",sans-serif; font-size:8.4pt;
+    color:#333; font-weight:bold; border-top:.5pt solid #C9D6E2;
+    padding-top:2mm; vertical-align:top;
+  }
+}
+@page:first{ @bottom-left{content:""; border:0} @bottom-right{content:""; border:0} }
+
+html{ -webkit-print-color-adjust:exact; }
+body{
+  font-family:"DejaVu Serif",serif; font-size:10.4pt; line-height:1.45; color:#1A1A1A;
+  margin:0; text-align:justify; hyphens:auto;
+}
+h1,h2,h3,h4,.ui,.mono,table,.note,.steps,.kv,.crumb,.toc{ font-family:"DejaVu Sans",sans-serif; }
+
+.cover{ text-align:center; page-break-after:always; padding-top:36mm; }
+.cover .org{ font-size:10.5pt; letter-spacing:.05em; text-transform:uppercase; color:#333; line-height:1.7; }
+.cover .rule{ border:0; border-top:2.5pt solid #005B9C; width:70%; margin:9mm auto 2mm; }
+.cover .rule2{ border:0; border-top:.8pt solid #005B9C; width:70%; margin:0 auto 12mm; }
+.cover h1{ font-size:25pt; margin:0 0 4mm; line-height:1.2; color:#003E6B; border:0; padding:0; }
+.cover .sub{ font-size:13.5pt; color:#333; margin-bottom:20mm; }
+.cover .ver{ font-size:11pt; color:#444; }
+.cover .foot{ margin-top:24mm; font-size:9.5pt; color:#555; }
+
+h1{ bookmark-level:1; font-size:15.5pt; color:#003E6B; margin:0 0 4mm; padding-bottom:2mm;
+    border-bottom:1.6pt solid #005B9C; page-break-after:avoid; text-align:left; }
+h2{ bookmark-level:2; font-size:12.4pt; color:#004C82; margin:7mm 0 2.5mm; page-break-after:avoid; text-align:left; }
+h3{ bookmark-level:3; font-size:10.8pt; color:#1A1A1A; margin:5mm 0 2mm; page-break-after:avoid; text-align:left; }
+.sec{ page-break-before:always; }
+p{ margin:0 0 2.6mm; }
+ul,ol{ margin:0 0 3mm; padding-left:6mm; }
+li{ margin-bottom:1.4mm; }
+
+.ui{ font-weight:600; color:#003E6B; }
+.mono{ font-family:"DejaVu Sans Mono",monospace; font-size:8.7pt; background:#F2F5F8; padding:0 1.1mm; border-radius:1mm; }
+b,strong{ color:#111; }
+
+table{ width:100%; border-collapse:collapse; font-size:8.8pt; margin:2.5mm 0 4mm; text-align:left; }
+thead{ display:table-header-group; }
+tr{ page-break-inside:avoid; }
+th{ background:#E7EFF6; border:.5pt solid #A9C2D8; padding:1.6mm 2mm; text-align:left;
+    font-size:8.2pt; text-transform:uppercase; letter-spacing:.03em; color:#003E6B; vertical-align:bottom; }
+td{ border:.5pt solid #C9D6E2; padding:1.6mm 2mm; vertical-align:top; line-height:1.32; }
+tbody tr:nth-child(even) td{ background:#F7FAFC; }
+td.c,th.c{ text-align:center; }
+table.narrow{ font-size:8.3pt; }
+
+.note,.warn,.tip,.new{
+  border:.6pt solid #C9D6E2; border-left:3pt solid #005B9C; background:#F4F8FB;
+  padding:2.6mm 3.2mm; margin:3mm 0; font-size:9.3pt; page-break-inside:avoid; text-align:left;
+}
+.warn{ border-left-color:#B26A00; background:#FDF7EC; border-color:#E3CFA5; }
+.tip{ border-left-color:#2B7A4B; background:#F1F8F3; border-color:#BEDCC8; }
+.new{ border-left-color:#6B3FA0; background:#F7F4FC; border-color:#D6C8E8; }
+.note .t,.warn .t,.tip .t,.new .t{ display:block; font-weight:700; margin-bottom:1mm; color:#003E6B; }
+.warn .t{ color:#8A5100; } .tip .t{ color:#1F5C38; } .new .t{ color:#523080; }
+
+.steps{ counter-reset:st; padding-left:0; list-style:none; margin:3mm 0; }
+.steps li{ counter-increment:st; position:relative; padding-left:9mm; margin-bottom:2.4mm; }
+.steps li:before{
+  content:counter(st); position:absolute; left:0; top:.2mm; width:6mm; height:6mm;
+  background:#005B9C; color:#fff; border-radius:3mm; text-align:center;
+  font-size:8.5pt; line-height:6mm; font-weight:700;
+}
+.kv{ font-size:9.2pt; margin:2mm 0 3mm; }
+.kv dt{ font-weight:700; color:#003E6B; }
+.kv dd{ margin:0 0 1.8mm 0; }
+.crumb{ font-size:9pt; color:#004C82; background:#EDF3F8; border:.5pt solid #C9D6E2;
+        padding:1.4mm 2.4mm; margin:0 0 3mm; border-radius:1mm; }
+
+.toc ul{ list-style:none; padding:0; margin:0; font-size:9.8pt; }
+.toc > ul > li{ margin-bottom:1.2mm; font-weight:600; color:#003E6B; }
+.toc ul ul{ padding-left:6mm; font-weight:400; color:#333; font-size:9.1pt; margin:.8mm 0 2mm; }
+.toc ul ul li{ margin-bottom:.5mm; }
+.toc a{ text-decoration:none; color:inherit; display:block; }
+.toc a::after{ content:" " leader('.') " " target-counter(attr(href), page);
+  font-weight:400; color:#555; font-size:8.5pt; }
