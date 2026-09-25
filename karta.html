@@ -1,0 +1,2082 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>KMZ · Яндекс.Карты · фото · линии · Excel</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.2/proj4.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/proj4leaflet/1.0.2/proj4leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exifr/dist/full.umd.js"></script>
+<script src="ppo-core.js?v=3.6.3"></script>
+<script src="ppo-refs.js?v=3.6.3"></script>
+<script src="ppo-kmz.js?v=3.6.3"></script>
+
+<style>
+:root{
+  --ink:#0d1b2a;--panel:#12233a;--panel-2:#0d1a2c;--line:#22384f;
+  --brand:#005B9C;--brand-hi:#2a86d6;--accent:#f2b705;
+  --text:#e8eef5;--muted:#8da0b6;--good:#39b56a;--bad:#e5484d;
+  --mono:"SFMono-Regular",ui-monospace,Menlo,Consolas,monospace;
+  --sans:"Inter","Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;font-family:var(--sans);color:var(--text);background:var(--ink);-webkit-text-size-adjust:100%}
+button{font-family:inherit}
+#app{display:flex;flex:1;min-height:0;width:100%;overflow:hidden}
+body{display:flex;flex-direction:column}
+.ppobar{flex:0 0 auto;background:linear-gradient(135deg,#005B9C,#003E6B);color:#fff;
+  display:flex;align-items:center;gap:12px;padding:8px 14px;font-size:13px}
+.ppobar .m{width:30px;height:30px;border-radius:8px;background:#fff;color:#005B9C;display:grid;
+  place-items:center;font-weight:800;font-size:11px;flex:0 0 auto}
+.ppobar b{font-size:14px;font-weight:700}
+.ppobar nav{margin-left:auto;display:flex;gap:4px;flex-wrap:wrap}
+.ppobar nav a{color:#fff;text-decoration:none;font-size:12.5px;font-weight:600;padding:5px 11px;
+  border-radius:999px;background:rgba(255,255,255,.13);white-space:nowrap}
+.ppobar nav a.on{background:#fff;color:#003E6B}
+@media(max-width:860px){.ppobar b{display:none}.ppobar nav{margin-left:0;overflow-x:auto}}
+
+#side{width:400px;min-width:400px;height:100%;background:linear-gradient(180deg,var(--panel),var(--panel-2));
+  border-right:1px solid var(--line);display:flex;flex-direction:column}
+.head{padding:15px 18px 13px;border-bottom:1px solid var(--line)}
+.brandline{display:flex;align-items:center;gap:10px}
+.spark{width:26px;height:26px;flex:0 0 auto;border-radius:6px;
+  background:radial-gradient(circle at 30% 30%,var(--brand-hi),var(--brand));box-shadow:0 0 0 1px rgba(255,255,255,.08) inset}
+.title{font-size:15px;font-weight:700;line-height:1.1}
+.subtitle{font-size:11px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase;margin-top:3px}
+
+.body{flex:1;overflow-y:auto;padding:15px 18px;-webkit-overflow-scrolling:touch}
+
+.drop{border:1.5px dashed var(--line);border-radius:12px;padding:18px 14px;text-align:center;
+  background:rgba(255,255,255,.015);transition:.15s;cursor:pointer}
+.drop.hover{border-color:var(--brand-hi);background:rgba(42,134,214,.08)}
+.drop .big{font-size:13px;font-weight:600}
+.drop .small{font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.5}
+.drop .file{margin-top:8px;font-size:11.5px;color:var(--accent);font-family:var(--mono);word-break:break-all}
+input[type=file]{display:none}
+
+.photobtn{width:100%;margin-top:10px;background:transparent;border:1px solid var(--line);border-radius:10px;
+  color:var(--text);padding:11px;font-size:13px;font-weight:600;cursor:pointer;transition:.12s}
+.photobtn:hover{border-color:var(--brand-hi)}
+.mergerow{margin-top:12px}
+.mlbl{display:block;font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.msel{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;color:var(--text);padding:9px 10px;font-size:12.5px;outline:none;cursor:pointer}
+.msel:focus{border-color:var(--brand-hi)}
+
+.sync-state{margin:8px 0 2px;padding:7px 10px;border-radius:8px;background:#EEF4FA;
+  border:1px solid #D3E1EE;color:#33506B;font-size:12px;line-height:1.35}
+.sync-state.warn{background:#FDF4E6;border-color:#EAD3A8;color:#7A5B1E}
+#autoSyncBtn.on{background:#E7F3EA;border-color:#B7DCC2;color:#1F6B3A}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:14px}
+.stat{background:rgba(255,255,255,.02);border:1px solid var(--line);border-radius:9px;padding:8px 8px}
+.stat .n{font-size:17px;font-weight:700;font-family:var(--mono);line-height:1}
+.stat .l{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-top:5px}
+
+.sectlabel{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin:18px 0 9px;
+  display:flex;align-items:center;gap:8px}
+.sectlabel::after{content:"";flex:1;height:1px;background:var(--line)}
+
+.toolbar{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+.tool{background:rgba(255,255,255,.02);border:1px solid var(--line);border-radius:9px;color:var(--text);
+  padding:10px 6px;font-size:12px;font-weight:600;cursor:pointer;transition:.12s;display:flex;flex-direction:column;
+  align-items:center;gap:5px;line-height:1.1;text-align:center}
+.tool:hover{border-color:var(--brand-hi)}
+.tool.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.tool .ic{font-size:16px}
+.toolhint{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.45}
+
+.search{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;
+  color:var(--text);padding:9px 11px;font-size:13px;outline:none}
+.search:focus{border-color:var(--brand-hi)}
+.rows{margin-top:10px;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+.rowitem{padding:9px 11px;border-bottom:1px solid var(--line);cursor:pointer;transition:.1s}
+.rowitem:last-child{border-bottom:0}
+.rowitem:hover{background:rgba(42,134,214,.1)}
+.rowitem .rn{font-size:13px;font-weight:600;line-height:1.25;display:flex;align-items:center;gap:7px}
+.rowitem .rmeta{font-size:11px;color:var(--muted);margin-top:3px;font-family:var(--mono)}
+.gdot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+.g-point{background:var(--accent)}.g-line{background:var(--brand-hi)}.g-poly{background:var(--good)}
+.cam{font-size:11px}
+.morerows{padding:9px;text-align:center;font-size:11.5px;color:var(--muted)}
+
+.foot{padding:12px 18px;border-top:1px solid var(--line)}
+.chk{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-bottom:10px;cursor:pointer}
+.chk input{width:16px;height:16px;accent-color:var(--brand-hi)}
+/* Кнопок восемь, в одну строку они не помещались: часть уезжала за край
+   панели и была визуально недоступна. Раскладываем сеткой по две в ряд. */
+.btnrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn{width:100%;border:0;border-radius:9px;padding:12px 8px;font-size:13px;font-weight:600;cursor:pointer;
+  transition:.12s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btn:active{transform:translateY(1px)}
+.btn-primary{background:var(--brand);color:#fff}.btn-primary:hover{filter:brightness(1.1)}
+.btn-primary:disabled{background:#243549;color:#5c718a;cursor:not-allowed;filter:none}
+.btn-alt{background:#1c3350;color:#fff;border:1px solid var(--line)}.btn-alt:hover{border-color:var(--brand-hi)}
+.btn-alt:disabled{color:#5c718a;cursor:not-allowed}
+.btn-ghost{background:transparent;color:var(--text);border:1px solid var(--line);padding:12px 14px}
+.btn-ghost:hover{border-color:var(--brand-hi)}
+
+#mapwrap{flex:1;position:relative;height:100%}
+#map{position:absolute;inset:0;background:#0a1420}
+.pin{background:transparent;border:0}
+/* подпись метки: номер опоры и наименование линии */
+.pm-lbl{background:rgba(9,18,30,.82);border:1px solid rgba(255,255,255,.18);border-radius:4px;
+  color:#eaf1f8;font:600 11px/1.25 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  padding:2px 5px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.45)}
+.pm-lbl:before{display:none}
+.pm-lbl .ln{display:block;font-weight:400;font-size:10px;opacity:.75}
+.legend{display:flex;flex-direction:column;gap:5px;font-size:11.5px;color:var(--muted);padding:2px 0 4px}
+.legend span{display:flex;align-items:center;gap:7px}
+.legend .lg{width:12px;height:12px;border-radius:50%;flex:0 0 auto;border:2px solid #000}
+.legend .lg.defect{background:#e5484d;border-color:#7a1216}
+.legend .lg.gap{background:#f5c542;border-color:#8a6410}
+.legend .lg.nophoto{background:#15171a;border-color:#000}
+.legend .lg.photo{background:var(--brand-hi);border-color:#0c3f6b}
+.pickbar{position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:1800;display:none;
+  align-items:center;gap:12px;background:#f5c542;color:#3a2c07;border-radius:9px;
+  padding:9px 14px;font-size:13px;font-weight:600;box-shadow:0 6px 22px rgba(0,0,0,.45);max-width:92vw}
+.pickbar.on{display:flex}
+.pickbar button{border:0;background:#3a2c07;color:#f5c542;border-radius:6px;padding:5px 11px;
+  font:inherit;font-size:12px;cursor:pointer;flex:0 0 auto}
+.pop-combo{border:1px solid var(--line);border-radius:8px;padding:6px 7px;background:rgba(255,255,255,.03)}
+.cmb-cur{font-size:11.5px;padding:4px 6px;border-radius:5px;margin-bottom:5px;line-height:1.35}
+.cmb-cur.auto{background:rgba(255,255,255,.06);color:var(--muted)}
+.cmb-cur.set{background:rgba(46,160,232,.16);color:var(--brand-hi)}
+.cmb-row{display:flex;gap:6px}
+.cmb-map,.cmb-auto{flex:1 1 0;border:1px solid var(--line);background:rgba(255,255,255,.05);
+  color:var(--text);border-radius:6px;padding:5px 6px;font:inherit;font-size:11.5px;cursor:pointer}
+.cmb-map:hover,.cmb-auto:hover:not(:disabled){border-color:var(--brand-hi);color:var(--brand-hi)}
+.cmb-auto:disabled{opacity:.4;cursor:default}
+.pop-inp{width:100%;padding:5px 7px;border-radius:6px;border:1px solid var(--line);
+  background:#0f1f33;color:var(--text);font:inherit;font-size:12.5px}
+.pop-more{margin:9px 0 2px;border:1px solid var(--line);border-radius:8px;padding:0 8px}
+.pop-more summary{cursor:pointer;font-size:12.5px;color:var(--brand-hi);padding:7px 0;list-style:none}
+.pop-more summary::-webkit-details-marker{display:none}
+.pop-more summary:before{content:"▸ ";}
+.pop-more[open] summary:before{content:"▾ ";}
+.pop-more .pop-field:last-child{margin-bottom:8px}
+.pop-chk{display:flex;align-items:flex-start;gap:7px;margin:8px 0 2px;font-size:12.5px;line-height:1.3;cursor:pointer}
+.pop-chk input{width:16px;height:16px;margin:1px 0 0;flex:0 0 auto}
+.pop-field{margin:8px 0 2px}
+.pop-sel{width:100%;padding:5px 7px;border-radius:6px;border:1px solid var(--line);
+  background:#0f1f33;color:var(--text);font:inherit;font-size:12.5px}
+.pop-gap{margin:7px 0 0;padding:5px 8px;border-radius:6px;background:rgba(245,197,66,.14);
+  border:1px solid rgba(245,197,66,.4);color:#f5c542;font-size:11.5px;line-height:1.35}
+.pindot{position:relative;width:15px;height:15px;border-radius:50%;background:var(--accent);border:2px solid #6b4e00;box-shadow:0 1px 4px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center}
+/* опора без фотографий: раньше была жёлтой, теперь чёрная — жёлтый занят разрывом цепи */
+.pin.nophoto .pindot{background:#15171a;border-color:#000}
+.pin.nophoto .pindot::after{content:"";position:absolute;top:4px;left:4px;width:5px;height:5px;border-radius:50%;background:#fff;opacity:.55}
+/* разрыв цепи: не определён предыдущий либо следующий сосед — как в «Осмотре» */
+.pin.gap .pindot{background:#f5c542;border-color:#8a6410;width:17px;height:17px}
+.pin.gap .pindot::after{content:"?";position:absolute;color:#5a4310;font-weight:900;font-size:11px;line-height:1}
+.pin.photo .pindot{background:var(--brand-hi);border-color:#0c3f6b}
+.pin.photo .pindot::after{content:"";position:absolute;top:3px;left:3px;width:7px;height:7px;border-radius:50%;background:#fff;opacity:.85}
+.pin.defect .pindot{width:19px;height:19px;background:#e5484d;border-color:#7a1216}
+.pin.defect .pindot::after{content:none}
+.pin.defect .pindot::before{content:"!";color:#ffd400;font-weight:900;font-size:14px;line-height:1;text-shadow:0 1px 1px rgba(0,0,0,.45)}
+
+.leaflet-popup-content-wrapper{background:#0f1f33;color:var(--text);border-radius:11px;border:1px solid var(--line)}
+.leaflet-popup-tip{background:#0f1f33;border:1px solid var(--line)}
+.leaflet-popup-content{margin:11px 13px;font-size:12.5px;line-height:1.5;min-width:210px}
+/* Карточка метки выросла: в ней и характеристики опоры, и признаки цепи.
+   Ограничиваем высоту окном браузера и прокручиваем содержимое, иначе низ
+   карточки уезжает за край экрана и до него приходится двигать карту. */
+.leaflet-popup-scrolled{overflow-y:auto;overscroll-behavior:contain;
+  border-bottom:0;border-top:0;padding-right:3px}
+.leaflet-popup-scrolled::-webkit-scrollbar{width:8px}
+.leaflet-popup-scrolled::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:4px}
+.leaflet-popup-scrolled::-webkit-scrollbar-track{background:transparent}
+.leaflet-container a.leaflet-popup-close-button{color:var(--muted)}
+.pop-photos{display:flex;gap:6px;overflow-x:auto;margin:-2px -2px 8px;padding:2px;align-items:center}
+.pop-photos img{height:120px;border-radius:8px;cursor:pointer;border:1px solid var(--line);flex:0 0 auto;display:block}
+.ph-cell{position:relative;flex:0 0 auto}
+.ph-del{position:absolute;top:4px;right:4px;width:20px;height:20px;border:0;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;font-size:12px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.ph-del:hover{background:var(--bad)}
+.ph-add{flex:0 0 auto;height:120px;min-width:78px;border:1.5px dashed var(--line);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12.5px;font-weight:600;cursor:pointer;text-align:center;padding:0 8px}
+.ph-add:hover{border-color:var(--brand-hi);color:var(--text)}
+.pop-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:8px 0 4px}
+.pop-name{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:7px;color:#fff;
+  font-size:14px;font-weight:700;padding:7px 9px;outline:none}
+.pop-name:focus{border-color:var(--brand-hi)}
+.pop-coord{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin:7px 0}
+.pop-kv{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;font-size:12px;margin-top:4px}
+.pop-kv .k{color:var(--muted)}
+.pop-act{display:flex;gap:7px;margin-top:10px}
+.pop-act button{flex:1;border:0;border-radius:7px;padding:8px;font-size:12px;font-weight:600;cursor:pointer}
+.pop-save{background:var(--brand);color:#fff}
+.pop-del{background:transparent;border:1px solid var(--bad);color:var(--bad)}
+
+.badge{position:absolute;top:12px;left:12px;z-index:500;background:rgba(13,26,44,.85);backdrop-filter:blur(8px);
+  border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:11.5px;color:var(--muted);
+  max-width:min(72vw,440px);line-height:1.45}
+.badge b{color:var(--text)}
+.drawbar{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:700;display:none;gap:8px;
+  background:rgba(15,31,51,.95);border:1px solid var(--line);border-radius:11px;padding:9px 10px;align-items:center}
+.drawbar.on{display:flex}
+.drawbar .len{font-family:var(--mono);font-size:13px;color:var(--accent);padding:0 6px;min-width:80px;text-align:center}
+.drawbar button{border:0;border-radius:8px;padding:9px 13px;font-size:12.5px;font-weight:600;cursor:pointer}
+.db-done{background:var(--good);color:#062}.db-undo{background:#1c3350;color:#fff}.db-cancel{background:transparent;border:1px solid var(--bad);color:var(--bad)}
+
+.toast{position:absolute;bottom:70px;left:50%;transform:translateX(-50%) translateY(20px);z-index:900;
+  background:#0f1f33;border:1px solid var(--line);color:var(--text);padding:11px 16px;border-radius:10px;
+  font-size:13px;opacity:0;pointer-events:none;transition:.25s;max-width:80vw;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{border-color:var(--bad)}
+
+/* поля правки в карточке */
+.pop-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
+.pop-field{margin-top:8px}
+.pop-field label{display:block;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+.pop-field input{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:7px;color:var(--text);padding:7px 9px;font-size:13px;outline:none}
+.pop-field input:focus{border-color:var(--brand-hi)}
+.pop-field.defect input{border-color:#5a2a2c}
+.pop-field.defect input:focus{border-color:#e5484d}
+
+/* палитра цвета линии */
+.palette{display:flex;gap:5px;align-items:center;padding-right:6px;border-right:1px solid var(--line);margin-right:2px}
+.sw{width:20px;height:20px;border-radius:5px;cursor:pointer;border:2px solid transparent;box-shadow:0 0 0 1px rgba(255,255,255,.15) inset}
+.sw.on{border-color:#fff}
+.palette input[type=color]{width:26px;height:24px;border:1px solid var(--line);border-radius:5px;background:none;padding:0;cursor:pointer}
+
+/* индикатор дефекта в списке */
+.gdot.g-defect{background:#e5484d}
+.rn .warn{color:#ffd400;font-weight:900;text-shadow:0 0 2px rgba(0,0,0,.5)}
+
+/* просмотр фото */
+#lightbox{position:fixed;inset:0;z-index:2000;background:rgba(4,10,18,.94);display:none;align-items:center;justify-content:center;flex-direction:column}
+#lightbox.on{display:flex}
+#lightbox img{max-width:92vw;max-height:80vh;border-radius:10px;box-shadow:0 12px 46px rgba(0,0,0,.6)}
+.lb-close{position:absolute;top:14px;right:18px;font-size:30px;line-height:1;color:#fff;background:none;border:0;cursor:pointer}
+.lb-nav{position:absolute;top:50%;transform:translateY(-50%);font-size:30px;color:#fff;background:rgba(0,0,0,.35);border:0;cursor:pointer;padding:8px 16px;border-radius:10px}
+.lb-prev{left:14px}.lb-next{right:14px}
+.lb-obj{display:block;font-size:14px;font-weight:700;color:#fff;margin-bottom:3px}
+.lb-sub{display:block;opacity:.72}
+.lb-cap{color:#c9d4e0;margin-top:12px;font-size:12.5px;font-family:var(--mono);max-width:90vw;text-align:center;word-break:break-all}
+
+/* мультивыбор */
+.ms{position:relative}
+.ms-head{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--panel-2);border:1px solid var(--line);border-radius:7px;color:var(--text);padding:8px 9px;font-size:13px;cursor:pointer;min-height:34px;line-height:1.3}
+.ms-head .ms-ph{color:var(--muted)}
+.ms-caret{color:var(--muted);font-size:11px;flex:0 0 auto}
+.ms-list{display:none;margin-top:5px;border:1px solid var(--line);border-radius:7px;background:var(--panel-2);max-height:180px;overflow-y:auto}
+.ms.open .ms-list{display:block}
+.ms-item{display:flex;gap:8px;align-items:flex-start;padding:8px 9px;font-size:12.5px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.05);line-height:1.35}
+.ms-item:last-child{border-bottom:0}
+.ms-item:hover{background:rgba(42,134,214,.12)}
+.ms-item input{margin-top:2px;accent-color:var(--brand-hi);flex:0 0 auto;width:15px;height:15px}
+.pop-field.defect .ms-head{border-color:#5a2a2c}
+
+/* зум в просмотрщике фото */
+.lb-stage{max-width:92vw;max-height:80vh;overflow:hidden;display:flex;align-items:center;justify-content:center;touch-action:none}
+#lightbox img{max-width:92vw;max-height:80vh;transform-origin:center center;cursor:grab;will-change:transform;user-select:none;-webkit-user-drag:none}
+#lightbox img.grabbing{cursor:grabbing}
+.lb-zoombar{position:absolute;top:14px;left:18px;display:flex;gap:6px;z-index:5}
+.lb-zoombar button{width:36px;height:36px;border:0;border-radius:8px;background:rgba(0,0,0,.42);color:#fff;font-size:19px;line-height:1;cursor:pointer}
+.lb-zoombar button:hover{background:rgba(0,0,0,.65)}
+
+.mobtab{display:none}
+@media (max-width:860px){
+  #app{flex-direction:column}
+  #side{width:100%;min-width:0;height:auto;max-height:56%;border-right:0;border-bottom:1px solid var(--line)}
+  #mapwrap{min-height:44%}
+  .mobtab{display:flex;border-bottom:1px solid var(--line)}
+  .mobtab button{flex:1;background:transparent;border:0;color:var(--muted);padding:11px;font-size:12.5px;font-weight:600;border-bottom:2px solid transparent}
+  .mobtab button.on{color:var(--text);border-bottom-color:var(--brand-hi)}
+  #app.view-map #side{display:none}
+  #app.view-list #mapwrap{display:none}
+}
+</style>
+</head>
+<body>
+<div class="ppobar">
+  <div class="m">ППО</div><b>Карта и KMZ</b>
+  <nav id="ppoNav"></nav>
+</div>
+
+<div id="app" class="view-list">
+
+  <div class="mobtab">
+    <button id="tabList" class="on" onclick="setView('list')">Данные</button>
+    <button id="tabMap" onclick="setView('map')">Карта</button>
+  </div>
+
+  <aside id="side">
+    <div class="head">
+      <div class="brandline">
+        <div class="spark"></div>
+        <div>
+          <div class="title">KMZ · Яндекс.Карты · Excel</div>
+          <div class="subtitle">Фото · метки · линии · маршрут</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="body">
+      <label class="drop" id="drop" for="fileInput">
+        <div class="big">Загрузите KMZ или KML</div>
+        <div class="small">Перетащите сюда или нажмите. Можно выбрать несколько файлов — они добавляются к уже загруженным.</div>
+        <div class="file" id="fileName"></div>
+      </label>
+      <input type="file" id="fileInput" accept=".kmz,.kml" multiple>
+      <button class="photobtn" onclick="document.getElementById('photoInput').click()">📷 Собрать метки из фото с геолокацией</button>
+      <input type="file" id="photoInput" accept="image/*" multiple>
+
+      <div class="mergerow">
+        <label class="mlbl" for="mergeMode">Объединять совпадающие метки</label>
+        <select class="msel" id="mergeMode">
+          <option value="off">Не объединять — каждая метка отдельно</option>
+          <option value="exact" selected>Точное совпадение координат</option>
+          <option value="2">В радиусе 2 м</option>
+          <option value="5">В радиусе 5 м</option>
+          <option value="10">В радиусе 10 м</option>
+          <option value="25">В радиусе 25 м</option>
+        </select>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="n" id="cPoint">0</div><div class="l">Точки</div></div>
+        <div class="stat"><div class="n" id="cLine">0</div><div class="l">Линии</div></div>
+        <div class="stat"><div class="n" id="cPoly">0</div><div class="l">Полиг.</div></div>
+        <div class="stat"><div class="n" id="cPhoto">0</div><div class="l">Фото</div></div>
+      </div>
+      <div class="sync-state" id="syncState">синхронизация с осмотром</div>
+
+      <div class="sectlabel">Инструменты</div>
+      <div class="toolbar">
+        <button class="tool" id="toolMove" onclick="setTool('move')"><span class="ic">✥</span>Двигать / править</button>
+        <button class="tool" id="toolPoint" onclick="setTool('point')"><span class="ic">➕</span>Добавить точку</button>
+        <button class="tool" id="toolLine" onclick="setTool('line')"><span class="ic">📏</span>Рисовать линию</button>
+      </div>
+      <div class="toolhint" id="toolHint">Выберите инструмент. Карточку метки можно открыть кликом — там переименование и удаление.</div>
+
+      <div class="sectlabel">Подписи на карте</div>
+      <div class="toolbar">
+        <button class="tool on" id="btnLblPole" onclick="toggleLabel('pole')"><span class="ic">№</span><span id="lblPoleTxt">Убрать номера опор</span></button>
+        <button class="tool on" id="btnLblLine" onclick="toggleLabel('line')"><span class="ic">ВЛ</span><span id="lblLineTxt">Убрать номера линий</span></button>
+      </div>
+      <div class="toolhint">Метка подписывается номером опоры и наименованием линии. На плотной трассе подписи можно убрать.</div>
+
+      <div class="sectlabel">Цвет метки</div>
+      <div class="legend">
+        <span><i class="lg defect"></i>дефект</span>
+        <span><i class="lg gap"></i>не определён сосед по цепи</span>
+        <span><i class="lg nophoto"></i>нет фотографий</span>
+        <span><i class="lg photo"></i>фотографии есть</span>
+      </div>
+
+      <div class="sectlabel">Объекты</div>
+      <input class="search" id="search" placeholder="Поиск по имени, папке, атрибутам…" oninput="renderList()">
+      <div class="rows" id="rows"><div class="morerows">Пока пусто. Загрузите KMZ или фото.</div></div>
+    </div>
+
+    <div class="foot">
+      <label class="chk"><input type="checkbox" id="nnOrder" checked>Упорядочить выгрузку по маршруту (ближайшие метки)</label>
+      <div class="btnrow">
+        <button class="btn btn-primary" id="toOsmotr" disabled onclick="sendToOsmotr()">→ В осмотр</button>
+        <button class="btn btn-alt" id="fromOsmotr" onclick="loadFromOsmotr()">Из осмотра</button>
+        <button class="btn btn-alt" id="saveMapBtn" onclick="saveMapNow()" title="Сохранить метки в браузере">💾 Сохранить</button>
+        <button class="btn btn-alt" id="autoSyncBtn" onclick="toggleAutoSync()">⇄ Синхронизация: авто</button>
+        <button class="btn btn-alt" id="exportBtn" disabled onclick="exportExcel()">Excel</button>
+        <button class="btn btn-alt" id="kmzBtn" disabled onclick="exportKMZ()">Сохранить KMZ</button>
+        <button class="btn btn-ghost" onclick="fitAll()" title="Показать все">⤢</button>
+        <button class="btn btn-ghost" onclick="clearAll()" title="Очистить всё">🗑</button>
+      </div>
+    </div>
+  </aside>
+
+  <div id="mapwrap">
+    <div id="map"></div>
+    <div class="badge" id="badge"><b>Подложки:</b> Яндекс, Google, OSM — значок ▤ справа сверху. При смене семейства карта подстраивает проекцию, метки остаются на местах.</div>
+    <div class="drawbar" id="drawbar">
+      <div class="palette" id="palette"></div>
+      <span class="len" id="drawLen">0 м</span>
+      <button class="db-undo" onclick="undoVertex()">↶ Точка</button>
+      <button class="db-done" onclick="finishLine()">Готово</button>
+      <button class="db-cancel" onclick="cancelLine()">✕</button>
+    </div>
+    <div class="toast" id="toast"></div>
+  </div>
+</div>
+
+<div id="pickBar" class="pickbar">
+  <span id="pickTxt"></span>
+  <button type="button" onclick="endPickNeighbour()">Отмена</button>
+</div>
+
+<div id="lightbox" onclick="if(event.target.id==='lightbox')closeLightbox()">
+  <button class="lb-close" onclick="closeLightbox()">✕</button>
+  <div class="lb-zoombar">
+    <button onclick="lbZoom(-1)" title="Уменьшить">−</button>
+    <button onclick="lbZoomReset()" title="Сбросить">⟳</button>
+    <button onclick="lbZoom(1)" title="Увеличить">+</button>
+  </div>
+  <button class="lb-nav lb-prev" onclick="lbPrev()">‹</button>
+  <div class="lb-stage" id="lbStage"><img id="lbImg" alt=""></div>
+  <button class="lb-nav lb-next" onclick="lbNext()">›</button>
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<script>
+/* ===== КАРТА: Leaflet в проекции Яндекса (EPSG:3395) ===== */
+proj4.defs("EPSG:3395","+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs");
+var yandexCRS = new L.Proj.CRS("EPSG:3395",
+  "+proj=merc +lon_0=0 +k=1 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs",
+  { origin:[-20037508.342789244,20037508.342789244],
+    resolutions:(function(){var r=[];for(var i=0;i<21;i++)r.push(156543.033928041/Math.pow(2,i));return r;})(),
+    bounds:L.bounds([-20037508.342789244,-20037508.342789244],[20037508.342789244,20037508.342789244]) });
+
+var map, featureLayer, layerControl, currentBaseName="Яндекс — Схема", activeCrsFam="yandex";
+function tl(url,opts){ return L.tileLayer(url,opts); }
+var GSUB=["0","1","2","3"];
+var BASES=[
+  {name:"Яндекс — Схема",fam:"yandex",make:function(){return tl("https://core-renderer-tiles.maps.yandex.net/tiles?l=map&x={x}&y={y}&z={z}&scale=1&lang=ru_RU",{maxZoom:20,attribution:"© Яндекс.Карты"});}},
+  {name:"Яндекс — Спутник",fam:"yandex",make:function(){return tl("https://core-sat.maps.yandex.net/tiles?l=sat&x={x}&y={y}&z={z}&lang=ru_RU",{maxZoom:20,attribution:"© Яндекс.Карты"});}},
+  {name:"Яндекс — Гибрид",fam:"yandex",make:function(){return L.layerGroup([
+      tl("https://core-sat.maps.yandex.net/tiles?l=sat&x={x}&y={y}&z={z}&lang=ru_RU",{maxZoom:20}),
+      tl("https://core-renderer-tiles.maps.yandex.net/tiles?l=skl&x={x}&y={y}&z={z}&scale=1&lang=ru_RU",{maxZoom:20})]);}},
+  {name:"Google — Схема",fam:"google",make:function(){return tl("https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&hl=ru",{subdomains:GSUB,maxZoom:21,attribution:"© Google"});}},
+  {name:"Google — Спутник",fam:"google",make:function(){return tl("https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}&hl=ru",{subdomains:GSUB,maxZoom:21,attribution:"© Google"});}},
+  {name:"Google — Гибрид",fam:"google",make:function(){return tl("https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&hl=ru",{subdomains:GSUB,maxZoom:21,attribution:"© Google"});}},
+  {name:"OpenStreetMap",fam:"google",make:function(){return tl("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"});}}
+];
+function baseByName(n){ for(var i=0;i<BASES.length;i++) if(BASES[i].name===n) return BASES[i]; return BASES[0]; }
+function buildMap(){
+  var fam=baseByName(currentBaseName).fam;
+  var center=[45.03,38.98], zoom=8;
+  if(map){ center=map.getCenter(); zoom=map.getZoom(); if(tool==="line") cancelLine(); map.off(); map.remove(); }
+  var crs = fam==="google" ? L.CRS.EPSG3857 : yandexCRS;
+  map=L.map("map",{crs:crs,zoomControl:true}).setView(center,zoom);
+  activeCrsFam=fam;
+  var layersObj={}, active=null;
+  BASES.forEach(function(b){ var lyr=b.make(); layersObj[b.name]=lyr; if(b.name===currentBaseName) active=lyr; });
+  (active||layersObj[BASES[0].name]).addTo(map);
+  layerControl=L.control.layers(layersObj,null,{position:"topright"}).addTo(map);
+  map.on("baselayerchange",onBaseChange);
+  featureLayer=L.featureGroup().addTo(map);
+  bindMapEvents();
+  redraw();
+  if(tool==="line") map.doubleClickZoom.disable();
+  map.getContainer().style.cursor=(tool==="point"||tool==="line")?"crosshair":"";
+}
+function onBaseChange(e){ var b=baseByName(e.name); currentBaseName=e.name; if(b.fam!==activeCrsFam) buildMap(); }
+function bindMapEvents(){
+  map.on("click",function(e){ if(tool==="point") addPointAt(e.latlng); else if(tool==="line") addVertex(e.latlng); });
+  map.on("dblclick",function(e){ if(tool==="line"){ L.DomEvent.stop(e); finishLine(); } });
+}
+
+/* ===== СОСТОЯНИЕ ===== */
+var placemarks=[], pmSeq=0, attrKeys=[], tool="none", LIST_LIMIT=300;
+var pointIndex={};
+var drawVertices=[], drawTemp=null, drawDots=[];
+var PALETTE=["#e5484d","#f2b705","#2a86d6","#39b56a","#ffffff","#111111"];
+var lineColor="#2a86d6";
+var lbPhotos=[], lbIndex=0;
+/* справочники из шаблона исходных данных (Спр_Опоры / Спр_Дефекты) */
+var POLE_TYPES=["Промежуточная","Анкерная","Анкерная угловая","Анкерно-угловая","Промежуточно-угловая","Ответвительная","Концевая"];
+var DEFECT_OPTS=[
+  {v:"A",t:"A — аварийное (размещение нельзя): разрушение защитного слоя, коррозия арматуры"},
+  {v:"Б",t:"Б — ограниченно работоспособное (после мероприятий): отклонение стойки, трещины сверх нормы"},
+  {v:"В",t:"В — работоспособное: малозначительные повреждения (сколы, загрязнение)"}
+];
+var LINE_DEFAULT="#2a86d6", POLY_DEFAULT="#39b56a", DEFECT_COLOR="#e5484d";
+function kmlColorToHex(c){ c=(c||"").replace(/[^0-9a-fA-F]/g,""); if(c.length<6) return null;
+  c=("ffffffff"+c).slice(-8); var bb=c.slice(2,4),gg=c.slice(4,6),rr=c.slice(6,8); return "#"+rr+gg+bb; }
+function hexToKml(hex){ hex=(hex||LINE_DEFAULT).replace("#",""); if(hex.length===3) hex=hex.split("").map(x=>x+x).join("");
+  return "ff"+hex.slice(4,6)+hex.slice(2,4)+hex.slice(0,2); }
+function hasDefect(pm){ return !!(pm.defect && String(pm.defect).trim()); }
+function strokeOf(pm){ return hasDefect(pm)?DEFECT_COLOR:(pm.color||(pm.type==="line"?LINE_DEFAULT:POLY_DEFAULT)); }
+
+/* ===== ЗАГРУЗКА ФАЙЛОВ ===== */
+var drop=document.getElementById("drop"), fileInput=document.getElementById("fileInput"), photoInput=document.getElementById("photoInput");
+fileInput.addEventListener("change",e=>{ if(e.target.files.length) loadMapFiles(e.target.files); e.target.value=""; });
+photoInput.addEventListener("change",e=>{ if(e.target.files.length) processPhotos(e.target.files); e.target.value=""; });
+["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("hover");}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("hover");}));
+drop.addEventListener("drop",e=>{e.preventDefault(); if(e.dataTransfer.files.length) loadMapFiles(e.dataTransfer.files);});
+
+var loadedNames=[];
+function pushLoadedName(n){ loadedNames.push(n);
+  var el=document.getElementById("fileName");
+  el.textContent = loadedNames.length===1 ? loadedNames[0] : ("Файлов: "+loadedNames.length+" — "+loadedNames.slice(-2).join(", "));
+}
+function loadMapFiles(files){ Array.prototype.forEach.call(files,function(f){ loadOneFile(f); }); }
+function loadOneFile(file){
+  pushLoadedName(file.name);
+  var r=new FileReader();
+  if(file.name.toLowerCase().endsWith(".kml")){
+    r.onload=()=>{ try{ parseKML(r.result,{},true); }catch(err){ toast("Ошибка KML: "+err.message,true);} };
+    r.readAsText(file);
+  } else {
+    r.onload=()=>loadKMZ(r.result,true);
+    r.readAsArrayBuffer(file);
+  }
+}
+function clearAll(){
+  if(placemarks.length && !confirm("Удалить все загруженные объекты с карты?")) return;
+  placemarks=[]; pointIndex={}; featureLayer.clearLayers(); loadedNames=[]; clearMapState();
+  document.getElementById("fileName").textContent="";
+  renderList(); updateStats(); toast("Очищено.");
+}
+function loadKMZ(buf,append){
+  JSZip.loadAsync(buf).then(zip=>{
+    var kmlName=null, imgTasks=[], imageMap={};
+    zip.forEach((path,entry)=>{
+      if(entry.dir) return;
+      var low=path.toLowerCase();
+      if(!kmlName && low.endsWith(".kml")) kmlName=path;
+      if(/\.(jpg|jpeg|png|gif|webp|bmp)$/.test(low)){
+        imgTasks.push(entry.async("blob").then(blob=>{
+          var url=URL.createObjectURL(blob), base=path.split("/").pop().toLowerCase(), ext=(low.split(".").pop());
+          var rec={url:url,blob:blob,ext:ext,name:path.split("/").pop()};
+          imageMap[low]=rec; imageMap[base]=rec;
+        }));
+      }
+    });
+    if(!kmlName){ toast("В KMZ не найден KML.",true); return; }
+    Promise.all(imgTasks).then(()=>zip.file(kmlName).async("string")).then(txt=>parseKML(txt,imageMap,append))
+      .catch(err=>toast("Ошибка распаковки: "+err.message,true));
+  }).catch(err=>toast("Не удалось открыть KMZ: "+err.message,true));
+}
+
+/* ===== РАЗБОР KML ===== */
+function parseKML(text,imageMap,append){
+  var xml=new DOMParser().parseFromString(text,"application/xml");
+  if(xml.querySelector("parsererror")){ toast("Файл не разбирается как XML.",true); return; }
+  if(!append){ placemarks=[]; pmSeq=0; }
+  var before=placemarks.length;
+  var styleColors=collectStyleColors(xml);
+  var pms=xml.getElementsByTagName("Placemark");
+  for(var i=0;i<pms.length;i++){
+    var pm=pms[i];
+    var name=textOf(pm,"name")||("Объект "+(i+1));
+    var descRaw=textOf(pm,"description")||"";
+    /* время метки задаёт порядок обхода, описание — источник замечания:
+       без них карта разбирала обход иначе, чем импорт KMZ */
+    var whenRaw=textOf(pm,"when")||(pm.getElementsByTagName("when")[0]
+                ? (pm.getElementsByTagName("when")[0].textContent||"").trim() : "");
+    var descPlain=descRaw.replace(/<[^>]*>/g," ").replace(/&nbsp;/gi," ")
+                         .replace(/&amp;/gi,"&").replace(/https?:\/\/\S+/gi," ")
+                         .replace(/\s+/g," ").trim().slice(0,300);
+    var folder=folderPath(pm);
+    var geoms=extractGeometry(pm); if(!geoms.length) continue;
+    var attrs=extractExtendedData(pm);
+    var res=resolveImages(descRaw,imageMap||{});
+    var descAttrs=res.attrs;
+    for(var k in descAttrs){ if(attrs[k]===undefined) attrs[k]=descAttrs[k]; }
+    if(res.text && Object.keys(descAttrs).length===0) attrs["Описание"]=res.text;
+    var fields=pullFields(attrs);
+    var col=placemarkColor(pm,styleColors);
+    geoms.forEach(function(g){
+      addPlacemark({name:name,folder:folder,type:g.type,coords:g.coords,attrs:Object.assign({},attrs),
+        photos:res.photos.slice(),pole:fields.pole,poleType:fields.poleType,defect:fields.defect,
+        when:whenRaw,descText:descPlain,order:i,color:col},false);
+    });
+  }
+  var added=placemarks.length-before;
+  if(added===0){ toast("В файле метки не найдены.",true); return; }
+  redraw(); fitAll();
+  toast("Добавлено объектов: "+added+" · всего на карте: "+placemarks.length);
+}
+function textOf(parent,tag){
+  for(var i=0;i<parent.childNodes.length;i++){var n=parent.childNodes[i];
+    if(n.nodeType===1 && (n.localName===tag||n.nodeName===tag)) return (n.textContent||"").trim();}
+  return "";
+}
+function folderPath(pm){
+  var names=[],node=pm.parentNode;
+  while(node&&node.nodeType===1){
+    if(node.localName==="Folder"||node.localName==="Document"){var nm=textOf(node,"name"); if(nm) names.unshift(nm);}
+    node=node.parentNode;
+  }
+  return names.join(" / ");
+}
+function extractGeometry(pm){
+  var out=[];
+  var pts=pm.getElementsByTagName("Point");
+  for(var i=0;i<pts.length;i++){var c=parseCoords(textOf(pts[i],"coordinates")); if(c.length) out.push({type:"point",coords:c});}
+  var ls=pm.getElementsByTagName("LineString");
+  for(var j=0;j<ls.length;j++){var cl=parseCoords(textOf(ls[j],"coordinates")); if(cl.length) out.push({type:"line",coords:cl});}
+  var tr=pm.getElementsByTagName("gx:Track");
+  for(var t=0;t<tr.length;t++){var ct=[],gc=tr[t].getElementsByTagName("gx:coord");
+    for(var g=0;g<gc.length;g++){var p=(gc[g].textContent||"").trim().split(/\s+/).map(Number); if(p.length>=2) ct.push([p[0],p[1],p[2]||0]);}
+    if(ct.length) out.push({type:"line",coords:ct});}
+  var pg=pm.getElementsByTagName("Polygon");
+  for(var q=0;q<pg.length;q++){
+    var ob=pg[q].getElementsByTagName("outerBoundaryIs")[0];
+    var ring=ob?textOf(ob.getElementsByTagName("LinearRing")[0],"coordinates"):textOf(pg[q].getElementsByTagName("LinearRing")[0]||pg[q],"coordinates");
+    var cp=parseCoords(ring); if(cp.length) out.push({type:"poly",coords:cp});
+  }
+  return out;
+}
+function parseCoords(str){ if(!str) return [];
+  var out=[]; str.trim().split(/\s+/).forEach(function(tok){var p=tok.split(",").map(Number);
+    if(p.length>=2&&isFinite(p[0])&&isFinite(p[1])) out.push([p[0],p[1],p[2]||0]);}); return out;
+}
+function pullFields(attrs){
+  var f={pole:"",poleType:"",defect:""};
+  var map={"Номер опоры":"pole","№ опоры":"pole","Тип опоры":"poleType","Категория дефекта":"defect","Дефект":"defect"};
+  for(var key in map){ if(attrs[key]!==undefined && attrs[key]!==""){ if(!f[map[key]]) f[map[key]]=attrs[key]; delete attrs[key]; } }
+  return f;
+}
+function lineColorFromStyle(st){ var ls=st.getElementsByTagName("LineStyle")[0]; if(!ls) return null; var c=textOf(ls,"color"); return c?kmlColorToHex(c):null; }
+function collectStyleColors(xml){
+  var m={}, sts=xml.getElementsByTagName("Style");
+  for(var i=0;i<sts.length;i++){ var id=sts[i].getAttribute("id"); if(!id) continue; var c=lineColorFromStyle(sts[i]); if(c) m["#"+id]=c; }
+  var maps=xml.getElementsByTagName("StyleMap");
+  for(var j=0;j<maps.length;j++){ var mid=maps[j].getAttribute("id"); if(!mid) continue;
+    var pairs=maps[j].getElementsByTagName("Pair");
+    for(var p=0;p<pairs.length;p++){ if(textOf(pairs[p],"key")==="normal"){ var su=textOf(pairs[p],"styleUrl").trim(); if(m[su]) m["#"+mid]=m[su]; } } }
+  return m;
+}
+function placemarkColor(pm,styleColors){
+  var inline=null;
+  for(var i=0;i<pm.childNodes.length;i++){ var n=pm.childNodes[i]; if(n.nodeType===1 && n.localName==="Style"){ inline=lineColorFromStyle(n); break; } }
+  if(inline) return inline;
+  var su=textOf(pm,"styleUrl").trim(); if(su && styleColors[su]) return styleColors[su];
+  return null;
+}
+function extractExtendedData(pm){
+  var attrs={},ed=pm.getElementsByTagName("ExtendedData")[0]; if(!ed) return attrs;
+  var d=ed.getElementsByTagName("Data");
+  for(var i=0;i<d.length;i++){var nm=d[i].getAttribute("name"),v=textOf(d[i],"value")||(d[i].textContent||"").trim(); if(nm) attrs[nm]=v;}
+  var sd=ed.getElementsByTagName("SimpleData");
+  for(var j=0;j<sd.length;j++){var nm2=sd[j].getAttribute("name"); if(nm2) attrs[nm2]=(sd[j].textContent||"").trim();}
+  return attrs;
+}
+function resolveImages(html,imageMap){
+  var out={attrs:{},photos:[],text:""};
+  if(!html){ return out; }
+  if(html.indexOf("<")<0){ out.text=html.trim(); return out; }
+  var doc=new DOMParser().parseFromString("<div>"+html+"</div>","text/html");
+  // атрибуты из таблицы ключ|значение
+  var trs=doc.getElementsByTagName("tr");
+  for(var i=0;i<trs.length;i++){var tds=trs[i].getElementsByTagName("td");
+    if(tds.length>=2){var k=(tds[0].textContent||"").trim(),v=(tds[1].textContent||"").trim(); if(k&&k.length<60) out.attrs[k]=v;}}
+  // изображения
+  var imgs=doc.getElementsByTagName("img");
+  for(var j=0;j<imgs.length;j++){
+    var src=imgs[j].getAttribute("src")||""; if(!src) continue;
+    var key=decodeURIComponent(src).replace(/^\.?\//,"").toLowerCase(), base=key.split("/").pop();
+    var rec=imageMap[key]||imageMap[base];
+    if(rec){ out.photos.push({url:rec.url,blob:rec.blob,ext:rec.ext,name:rec.name}); }
+    else if(/^https?:/i.test(src)){ out.photos.push({url:src,remote:true,origSrc:src}); }
+  }
+  var plain=(doc.body.textContent||"").replace(/\s+/g," ").trim();
+  out.text=plain;
+  return out;
+}
+
+/* ===== ДОБАВЛЕНИЕ / ОТРИСОВКА ===== */
+function coordKey(rep){ return rep[1].toFixed(7)+","+rep[0].toFixed(7); }
+/* Параметры всплывающей карточки. Максимальная высота — доля видимой части
+   окна, чтобы карточка помещалась целиком и прокручивалась внутри себя, а не
+   уезжала за край экрана. */
+function popupOpts(){
+  var h=(window.innerHeight||700);
+  return { maxWidth:340, minWidth:230,
+           maxHeight: Math.max(240, Math.round(h*0.62)),
+           autoPan:true, autoPanPadding:[14,14], keepInView:true };
+}
+function mergeCfg(){
+  var el=document.getElementById("mergeMode"); var v=el?el.value:"exact";
+  if(v==="off") return {mode:"off"};
+  if(v==="exact") return {mode:"exact"};
+  return {mode:"radius", r:parseFloat(v)};
+}
+function findMergeTarget(rep){
+  var c=mergeCfg();
+  if(c.mode==="off") return null;
+  if(c.mode==="exact") return pointIndex[coordKey(rep)]||null;
+  var best=null, bd=c.r;
+  for(var i=0;i<placemarks.length;i++){ var p=placemarks[i]; if(p.type!=="point") continue;
+    var d=haversine(rep,p.rep); if(d<=bd){ bd=d; best=p; } }
+  return best;
+}
+function mergePhotos(pm,photos){
+  var added=0;
+  (photos||[]).forEach(function(ph){
+    var dup=pm.photos.some(function(x){ return x.name===ph.name && (x.blob&&ph.blob ? x.blob.size===ph.blob.size : x.url===ph.url); });
+    if(!dup){ pm.photos.push(ph); added++; }
+  });
+  return added;
+}
+function addPlacemark(o,doRedraw){
+  var rep=representative(o);
+  if(o.type==="point"){
+    var ex=findMergeTarget(rep);
+    if(ex){ // объединяем в существующую метку, фото сливаем (дубли по имени+размеру отсеиваются)
+      mergePhotos(ex,o.photos||[]);
+      if(doRedraw){ if(ex.layer&&ex.layer.setIcon) ex.layer.setIcon(makeIcon(ex)); renderList(); updateStats(); if(ex.layer) ex.layer.setPopupContent(buildPopup(ex)); }
+      return ex;
+    }
+  }
+  var pm={id:++pmSeq,name:o.name||("Объект "+pmSeq),folder:o.folder||"",type:o.type,
+    coords:o.coords,rep:rep,attrs:o.attrs||{},photos:o.photos||[],length:0,
+    when:o.when||"",descText:o.descText||"",order:(o.order===undefined?pmSeq:o.order),
+    pole:o.pole||"",poleType:o.poleType||"",defect:o.defect||"",
+    poleId:o.poleId||"",kv:o.kv||"",dirty:false,
+    color:o.color||(o.type==="line"?LINE_DEFAULT:(o.type==="poly"?POLY_DEFAULT:null))};
+  if(pm.type==="line"){ pm.length=lineLength(pm.coords); pm.attrs["Длина, м"]=Math.round(pm.length); pm.attrs["Длина, км"]=+(pm.length/1000).toFixed(3); }
+  placemarks.push(pm);
+  if(pm.type==="point") pointIndex[coordKey(pm.rep)]=pm;
+  if(doRedraw){ drawPlacemark(pm); renderList(); updateStats(); }
+  scheduleSave();
+  return pm;
+}
+function representative(o){
+  if(o.rep) return o.rep;
+  if(o.type==="point") return [o.coords[0][0],o.coords[0][1]];
+  var sx=0,sy=0; o.coords.forEach(c=>{sx+=c[0];sy+=c[1];}); return [sx/o.coords.length,sy/o.coords.length];
+}
+function redraw(){ refreshGaps(); featureLayer.clearLayers(); placemarks.forEach(drawPlacemark); renderList(); updateStats(); }
+/* Полнота привязки опоры в цепи — по идентификатору опоры в осмотре.
+   Пересчитывается один раз на отрисовку: цепь на каждую метку считать дорого. */
+var gapById={};
+function refreshGaps(){
+  try{ gapById=PPO.poleLinkGapAll(); }catch(e){ gapById={}; }
+}
+function gapOf(pm){
+  if(!pm || pm.type!=="point") return "";
+  return (pm.poleId && gapById[pm.poleId]) ? gapById[pm.poleId] : "";
+}
+/* Порядок важнее оттенка: дефект перекрывает всё, затем разрыв цепи, затем
+   отсутствие фотографий. Раньше жёлтым помечалось отсутствие фотографий —
+   теперь жёлтый занят разрывом цепи (как в «Осмотре»), а метка без снимков
+   стала чёрной. */
+/* опора в осмотре, за которой закреплена метка.
+   Снимок данных передаётся снаружи: за одну отрисовку карточки опора искалась
+   несколько раз, и каждый раз объект читался и разбирался заново. */
+function poleOfMark(pm, snap){
+  if(!pm || pm.type!=="point") return null;
+  var d=snap; if(!d){ try{ d=PPO.load(); }catch(e){ return null; } }
+  var hit=null;
+  if(pm.poleId) d.poles.forEach(function(p){ if(!hit && p.id===pm.poleId) hit=p; });
+  if(!hit){
+    var num=String(guessPoleNumber(pm)||"").trim(), ln=String(pm.folder||"").trim();
+    if(num) d.poles.forEach(function(p){
+      if(!hit && String(p.num||"").trim()===num && String(p.line||"").trim()===ln) hit=p; });
+  }
+  return hit;
+}
+/* простой выпадающий список из справочника */
+function selectEl(label,options,current,placeholder){
+  var w=document.createElement("div"); w.className="pop-field";
+  var l=document.createElement("div"); l.className="pop-lbl"; l.textContent=label;
+  var sel=document.createElement("select"); sel.className="pop-sel";
+  var o0=document.createElement("option"); o0.value=""; o0.textContent=placeholder||"— не выбрано —";
+  sel.appendChild(o0);
+  (options||[]).forEach(function(v){
+    var o=document.createElement("option"); o.value=v; o.textContent=v;
+    if(String(v)===String(current||"")) o.selected=true;
+    sel.appendChild(o);
+  });
+  w.appendChild(l); w.appendChild(sel);
+  w._get=function(){ return sel.value; };
+  w._el=sel;
+  return w;
+}
+/* линия: свободный ввод с подсказкой из линий, уже встречающихся в проекте —
+   полевое обозначение фидера редко совпадает с договорным */
+function lineFieldEl(label,current,snap){
+  var w=document.createElement("div"); w.className="pop-field";
+  var l=document.createElement("div"); l.className="pop-lbl"; l.textContent=label;
+  var id="dl-line-"+Math.random().toString(36).slice(2,7);
+  var inp=document.createElement("input"); inp.className="pop-inp"; inp.value=current||"";
+  inp.setAttribute("list",id); inp.placeholder="ВЛ 10 кВ ТМ-6";
+  var dl=document.createElement("datalist"); dl.id=id;
+  /* линии берём из готового снимка: отдельный вызов заново читал бы объект */
+  var lines=[], seen={};
+  if(snap && snap.poles){
+    (snap.lines||[]).concat(snap.poles).forEach(function(x){
+      var t=String((x.disp||x.line)||"").trim();
+      if(t && !seen[t.toLowerCase()]){ seen[t.toLowerCase()]=1; lines.push(t); }
+    });
+  } else { try{ lines=PPO.projectLines(); }catch(e){} }
+  lines.forEach(function(v){ var o=document.createElement("option"); o.value=v; dl.appendChild(o); });
+  w.appendChild(l); w.appendChild(inp); w.appendChild(dl);
+  w._get=function(){ return inp.value.trim(); };
+  return w;
+}
+/* марка опоры: перечень зависит от класса напряжения и обновляется вместе с ним */
+function markFieldEl(fKv,current){
+  var w=document.createElement("div"); w.className="pop-field";
+  var l=document.createElement("div"); l.className="pop-lbl"; l.textContent="Марка опоры";
+  var sel=document.createElement("select"); sel.className="pop-sel";
+  var hint=document.createElement("div"); hint.className="pop-hint"; hint.style.marginTop="3px";
+  function fill(){
+    var kv=fKv._get(), keep=sel.value||current||"";
+    sel.innerHTML="";
+    var o0=document.createElement("option"); o0.value=""; o0.textContent="— не выбрана —";
+    sel.appendChild(o0);
+    var arr=[];
+    try{ arr = kv ? PPO.polesByKv(kv) : PPO.POLES; }catch(e){ arr=[]; }
+    arr.forEach(function(r){
+      var o=document.createElement("option"); o.value=r.mark;
+      o.textContent=r.mark+" · "+(r.type||"")+(r.proj?" · "+r.proj:"");
+      if(r.mark===keep) o.selected=true;
+      sel.appendChild(o);
+    });
+    paintHint();
+  }
+  function paintHint(){
+    var r=null; try{ r=PPO.poleByMark(sel.value); }catch(e){}
+    if(!r){ hint.textContent=sel.value?"Марки нет в справочнике — заведите её в разделе «Справочники».":""; return; }
+    hint.textContent=(r.mat||"")+" · стойка "+(r.st||"—")+" · M\u2009доп "+(r.m_adm||"—")+" кН·м"+
+      (r.approx?" · значения приняты по аналогии":"");
+  }
+  sel.onchange=paintHint;
+  if(fKv && fKv._el) fKv._el.addEventListener("change",fill);
+  w.appendChild(l); w.appendChild(sel); w.appendChild(hint);
+  fill();
+  w._get=function(){ return sel.value; };
+  return w;
+}
+
+function chkEl(label,on){
+  var w=document.createElement("label"); w.className="pop-chk";
+  var i=document.createElement("input"); i.type="checkbox"; i.checked=!!on;
+  var t=document.createElement("span"); t.textContent=label;
+  w.appendChild(i); w.appendChild(t);
+  w._get=function(){ return i.checked; };
+  return w;
+}
+/* расстояние между опорами, м (для сортировки «сначала ближайшие») */
+function poleDist(a,b){
+  var la=parseFloat(String(a.lat).replace(",",".")), lo=parseFloat(String(a.lon).replace(",","."));
+  var lb=parseFloat(String(b.lat).replace(",",".")), ob=parseFloat(String(b.lon).replace(",","."));
+  if(!(la&&lo&&lb&&ob)) return null;
+  var R=6371000,t=Math.PI/180;
+  var dla=(lb-la)*t, dlo=(ob-lo)*t;
+  var x=Math.sin(dla/2)*Math.sin(dla/2)+Math.cos(la*t)*Math.cos(lb*t)*Math.sin(dlo/2)*Math.sin(dlo/2);
+  return Math.round(2*R*Math.atan2(Math.sqrt(x),Math.sqrt(1-x)));
+}
+
+/* Выбор соседней опоры. Перечня и поиска здесь нет намеренно: на карте сосед
+   виден глазами, а копаться в списке из сотни номеров дольше, чем ткнуть в
+   метку. Показываем текущее значение и два действия — указать на карте либо
+   вернуться к определению по координатам. */
+function poleComboEl(label,pole,which,pm,snap,rec){
+  var w=document.createElement("div"); w.className="pop-field pop-combo";
+  var l=document.createElement("div"); l.className="pop-lbl"; l.textContent=label;
+  w.appendChild(l);
+
+  var d=snap||{poles:[]};
+  var autoNum="";
+  try{ if(rec) autoNum=String((which==="next"?rec.nextNum:rec.prevNum)||""); }catch(e){}
+
+  var cur=String(pole[which+"Id"]||"");
+  var cap=document.createElement("div"); cap.className="cmb-cur";
+  var row=document.createElement("div"); row.className="cmb-row";
+  var mapBtn=document.createElement("button"); mapBtn.type="button"; mapBtn.className="cmb-map";
+  mapBtn.textContent="Указать на карте";
+  var autoBtn=document.createElement("button"); autoBtn.type="button"; autoBtn.className="cmb-auto";
+  autoBtn.textContent="По координатам";
+
+  function paintCur(){
+    if(!cur){
+      cap.className="cmb-cur auto";
+      cap.textContent="По координатам"+(autoNum?": № "+autoNum:" — в этой линии не найдена");
+      autoBtn.disabled=true;
+      return;
+    }
+    autoBtn.disabled=false;
+    var x=d.poles.filter(function(y){ return y.id===cur; })[0];
+    cap.className="cmb-cur set";
+    cap.textContent=x
+      ? ("Задано вручную: № "+(x.num||"?")+" · "+(x.line||"без линии")+
+         (x.kv?" · "+x.kv+" кВ":"")+(poleDist(pole,x)!==null?" · "+poleDist(pole,x)+" м":""))
+      : "Задано вручную: опора удалена";
+  }
+  mapBtn.onclick=function(){ startPickNeighbour(pm, pole, which); };
+  autoBtn.onclick=function(){ cur=""; paintCur(); };
+
+  row.appendChild(mapBtn); row.appendChild(autoBtn);
+  w.appendChild(cap); w.appendChild(row);
+  paintCur();
+  w._get=function(){ return cur; };
+  return w;
+}
+
+/* ------- выбор соседа кликом по метке на карте -------
+   Пока режим включён, клик по метке не открывает её карточку, а назначает
+   опору соседом. Всплывающие карточки на время снимаем: иначе клик открывал бы
+   их поверх выбора. */
+/* Счётчик приостановок обратной подстановки из осмотра. Считаем именно
+   счётчиком, а не флагом: сохранений может идти несколько подряд. */
+var pullMuted=0;
+
+var pickState=null;
+function startPickNeighbour(pm, pole, which){
+  pickState={ pmId:pm.id, poleId:pole.id, which:which };
+  map.closePopup();
+  /* Карточки меток не отвязываем: на объекте в сотни опор это столько же
+     операций со слоями. Достаточно закрыть открывшуюся карточку в самом
+     обработчике клика — режим выбора живёт считаные секунды. */
+  var bar=document.getElementById("pickBar");
+  document.getElementById("pickTxt").textContent=
+    "Укажите "+(which==="next"?"следующую":"предыдущую")+" опору для № "+(pole.num||"?")+
+    ": кликните по её метке на карте.";
+  bar.classList.add("on");
+}
+function endPickNeighbour(){
+  pickState=null;
+  document.getElementById("pickBar").classList.remove("on");
+}
+function pickNeighbourAt(pm){
+  if(!pickState) return false;
+  var st=pickState;
+  map.closePopup();                       /* карточка выбранной метки не нужна */
+  var tgt=poleOfMark(pm);
+  if(!tgt){ toast("У этой метки нет опоры в осмотре — сначала перенесите её.",true); return true; }
+  if(tgt.id===st.poleId){ toast("Опора не может быть соседом самой себе.",true); return true; }
+  var opts={}; opts[st.which+"Id"]=tgt.id;
+  try{ PPO.setPoleLinks(st.poleId, opts); }catch(e){}
+  endPickNeighbour();
+  refreshAllVisual();
+  var src=placemarks.filter(function(x){ return x.id===st.pmId; })[0];
+  toast((st.which==="next"?"Следующая":"Предыдущая")+" опора задана: № "+(tgt.num||"?"));
+  /* карточку исходной метки открываем следующим кадром: иначе она строится
+     в том же обработчике клика, и подвисание складывается из обоих действий */
+  if(src && src.layer && src.layer.openPopup)
+    setTimeout(function(){ src.layer.openPopup(); }, 0);
+  return true;
+}
+
+function makeIcon(pm){
+  var cls="pin";
+  if(hasDefect(pm)) cls+=" defect";
+  else if(gapOf(pm)) cls+=" gap";
+  else if(pm.photos.length) cls+=" photo";
+  else cls+=" nophoto";
+  var sz=hasDefect(pm)?19:15, anc=sz/2;
+  return L.divIcon({className:cls,html:'<div class="pindot"></div>',iconSize:[sz,sz],iconAnchor:[anc,anc]});
+}
+/* ------- подписи меток на карте ------- */
+var showLbl={pole:true,line:true};
+function labelHtml(pm){
+  var num=String(guessPoleNumber(pm)||"").trim();
+  var ln=String(pm.folder||"").trim();
+  var out="";
+  if(showLbl.pole && num) out+=esc(num);
+  if(showLbl.line && ln) out+=(out?'<span class="ln">'+esc(ln)+'</span>':'<span class="ln">'+esc(ln)+'</span>');
+  return out;
+}
+function applyLabel(pm){
+  if(!pm.layer || pm.type!=="point" || !pm.layer.bindTooltip) return;
+  var html=labelHtml(pm);
+  if(pm.layer.getTooltip && pm.layer.getTooltip()) pm.layer.unbindTooltip();
+  if(!html) return;
+  pm.layer.bindTooltip(html,{permanent:true,direction:"right",offset:[9,0],className:"pm-lbl",opacity:1});
+}
+function toggleLabel(kind){
+  showLbl[kind]=!showLbl[kind];
+  var b=document.getElementById(kind==="pole"?"btnLblPole":"btnLblLine");
+  var t=document.getElementById(kind==="pole"?"lblPoleTxt":"lblLineTxt");
+  b.classList.toggle("on",showLbl[kind]);
+  t.textContent=(showLbl[kind]?"Убрать ":"Показать ")+(kind==="pole"?"номера опор":"номера линий");
+  placemarks.forEach(applyLabel);
+  try{ localStorage.setItem("ppo_map_labels_v1",JSON.stringify(showLbl)); }catch(e){}
+}
+(function(){ try{
+  var v=JSON.parse(localStorage.getItem("ppo_map_labels_v1")||"null");
+  if(v && typeof v==="object"){ showLbl.pole=!!v.pole; showLbl.line=!!v.line; }
+}catch(e){} })();
+
+function drawPlacemark(pm){
+  var layer;
+  if(pm.type==="point"){
+    layer=L.marker([pm.rep[1],pm.rep[0]],{icon:makeIcon(pm),draggable:(tool==="move"||tool==="point")});
+    layer.on("click",function(e){
+      /* режим выбора соседа перехватывает клик до карточки */
+      if(pickNeighbourAt(pm) && L.DomEvent) L.DomEvent.stop(e);
+    });
+    layer.on("dragend",function(e){ var ll=e.target.getLatLng();
+      var oldKey=coordKey(pm.rep);
+      pm.rep=[ll.lng,ll.lat]; pm.coords[0]=[ll.lng,ll.lat,pm.coords[0][2]||0];
+      if(pointIndex[oldKey]===pm) delete pointIndex[oldKey]; pointIndex[coordKey(pm.rep)]=pm;
+      pm.dirty=true;
+      renderList(); e.target.setPopupContent(buildPopup(pm));
+      scheduleSave();
+      if(autoSync && pm.type==="point" && guessPoleNumber(pm)){
+        syncOne(pm).then(function(r){
+          /* перемещение метки меняет длину пролёта до соседней опоры:
+             раньше координаты обновлялись, а пролёт оставался прежним */
+          var sp = (r && r.spans && r.spans.changed) ? " · пересчитано пролётов: "+r.spans.changed : "";
+          toast("Координаты обновлены и перенесены в осмотр: "+ll.lat.toFixed(6)+", "+ll.lng.toFixed(6)+sp);
+        });
+      } else {
+        toast("Новые координаты: "+ll.lat.toFixed(6)+", "+ll.lng.toFixed(6));
+      }
+    });
+  } else if(pm.type==="line"){
+    layer=L.polyline(pm.coords.map(c=>[c[1],c[0]]),{color:strokeOf(pm),weight:3,opacity:.95});
+  } else {
+    var col=strokeOf(pm);
+    layer=L.polygon(pm.coords.map(c=>[c[1],c[0]]),{color:col,weight:2,fillColor:col,fillOpacity:.18});
+  }
+  layer.bindPopup(function(){ return buildPopup(pm); },popupOpts());
+  pm.layer=layer; featureLayer.addLayer(layer);
+  applyLabel(pm);
+}
+function addPhotosToPm(pm,files){
+  var added=0;
+  Array.prototype.forEach.call(files,function(file){
+    if(!/^image\//.test(file.type||"") && !/\.(jpe?g|png|gif|webp|bmp)$/i.test(file.name)) return;
+    var url=URL.createObjectURL(file), ext=(file.name.split(".").pop()||"jpg").toLowerCase();
+    pm.photos.push({url:url,blob:file,ext:ext,name:file.name}); added++;
+  });
+  if(!added){ toast("Не выбрано изображений.",true); return; }
+  if(pm.type==="point"&&pm.layer&&pm.layer.setIcon) pm.layer.setIcon(makeIcon(pm));
+  renderList(); updateStats();
+  if(pm.layer){ pm.layer.setPopupContent(buildPopup(pm)); pm.layer.openPopup(); }
+  toast("Добавлено фото: "+added);
+}
+function updatePmVisual(pm){ if(pm.layer) featureLayer.removeLayer(pm.layer); drawPlacemark(pm); }
+/* Перекраска после изменения цепи. Пересоздавать все метки нельзя: на объекте
+   в несколько сотен опор это снимает и заново строит столько же слоёв и
+   постоянных подписей, и браузер замирает на секунды. Сравниваем прежние
+   признаки с новыми и трогаем только те метки, у которых цвет изменился, —
+   причём меняем иконку у существующего слоя, а не сам слой. */
+function refreshAllVisual(){
+  var was=gapById;
+  refreshGaps();
+  var n=0;
+  placemarks.forEach(function(pm){
+    if(pm.type!=="point" || !pm.layer || !pm.layer.setIcon) return;
+    var id=pm.poleId||"";
+    if(String(was[id]||"")===String(gapById[id]||"")) return;
+    pm.layer.setIcon(makeIcon(pm)); n++;
+  });
+  return n;
+}
+
+/* ===== КАРТОЧКА МЕТКИ (фото + правка) ===== */
+function fieldEl(labelText,value,cls,listId){
+  var w=document.createElement("div"); w.className="pop-field"+(cls?" "+cls:"");
+  var l=document.createElement("label"); l.textContent=labelText; w.appendChild(l);
+  var inp=document.createElement("input"); inp.value=value||""; if(listId) inp.setAttribute("list",listId);
+  w.appendChild(inp); w._input=inp; w._get=function(){return inp.value.trim();}; return w;
+}
+function multiSelect(labelText,options,current,cls){
+  var selected=new Set(String(current||"").split(/\s*[;,]\s*/).map(s=>s.trim()).filter(Boolean));
+  var w=document.createElement("div"); w.className="pop-field"+(cls?" "+cls:"");
+  var l=document.createElement("label"); l.textContent=labelText; w.appendChild(l);
+  var ms=document.createElement("div"); ms.className="ms";
+  var head=document.createElement("div"); head.className="ms-head";
+  var ht=document.createElement("span"); var car=document.createElement("span"); car.className="ms-caret"; car.textContent="▾";
+  head.appendChild(ht); head.appendChild(car);
+  var list=document.createElement("div"); list.className="ms-list";
+  function refresh(){ var v=Array.from(selected); if(v.length){ ht.textContent=v.join("; "); ht.className=""; } else { ht.textContent="— не выбрано —"; ht.className="ms-ph"; } }
+  options.forEach(function(o){
+    var v=(typeof o==="string")?o:o.v, t=(typeof o==="string")?o:o.t;
+    var row=document.createElement("label"); row.className="ms-item";
+    var cb=document.createElement("input"); cb.type="checkbox"; cb.checked=selected.has(v);
+    cb.onchange=function(){ cb.checked?selected.add(v):selected.delete(v); refresh(); };
+    var sp=document.createElement("span"); sp.textContent=t;
+    row.appendChild(cb); row.appendChild(sp); list.appendChild(row);
+  });
+  head.onclick=function(){ ms.classList.toggle("open"); };
+  ms.appendChild(head); ms.appendChild(list); w.appendChild(ms);
+  refresh();
+  w._get=function(){ return Array.from(selected).join("; "); };
+  return w;
+}
+function buildPopup(pm){
+  var d=document.createElement("div");
+
+  var gallery=document.createElement("div"); gallery.className="pop-photos";
+  (pm.photos||[]).forEach(function(ph,idx){
+    var cell=document.createElement("div"); cell.className="ph-cell";
+    var im=document.createElement("img"); im.src=ph.url; im.loading="lazy"; im.title="Открыть фото";
+    im.onclick=function(){ openLightbox(pm.photos,idx,photoTitleOf(pm,snapForPhoto())); };
+    var rm=document.createElement("button"); rm.className="ph-del"; rm.textContent="✕"; rm.title="Удалить фото";
+    rm.onclick=function(e){ e.stopPropagation(); pm.photos.splice(idx,1);
+      if(pm.type==="point"&&pm.layer&&pm.layer.setIcon) pm.layer.setIcon(makeIcon(pm));
+      renderList(); updateStats(); scheduleSave();
+      if(pm.layer){ pm.layer.setPopupContent(buildPopup(pm)); pm.layer.openPopup(); } };
+    cell.appendChild(im); cell.appendChild(rm); gallery.appendChild(cell);
+  });
+  var addCell=document.createElement("label"); addCell.className="ph-add"; addCell.textContent="＋ Фото";
+  var fin=document.createElement("input"); fin.type="file"; fin.accept="image/*"; fin.multiple=true; fin.style.display="none";
+  fin.onchange=function(){ if(fin.files.length) addPhotosToPm(pm,fin.files); };
+  addCell.appendChild(fin); gallery.appendChild(addCell);
+  d.appendChild(gallery);
+
+  var lbl=document.createElement("div"); lbl.className="pop-lbl"; lbl.textContent="Название"; d.appendChild(lbl);
+  var nameInp=document.createElement("input"); nameInp.className="pop-name"; nameInp.value=pm.name; d.appendChild(nameInp);
+  /* Исходные значения на момент открытия карточки. По ним отличаем правку
+     названия от правки номера: раньше номер брался только из поля «Номер
+     опоры», и переименование метки в осмотр не доходило вовсе. */
+  var name0=String(pm.name||""), pole0=String(pm.pole||"");
+
+  var nameHint=document.createElement("div");
+  nameHint.className="pop-hint";
+  d.appendChild(nameHint);
+
+  var fPole=fieldEl("Номер опоры",pm.pole);
+  d.appendChild(fPole);
+
+  /* Характеристики опоры правятся прямо здесь: полевой обход нередко даёт
+     неверную линию или класс напряжения, и уходить ради этого в «Осмотр»
+     незачем. Набор полей и правила те же, что в карточке опоры. */
+  /* один снимок данных на всю карточку: и опора, и её запись в цепи, и
+     перечни справочников берутся из него, а не читаются заново для каждого поля */
+  var snap=null; try{ snap=PPO.load(); }catch(e){ snap={poles:[]}; }
+  var linkedPole=poleOfMark(pm, snap);
+  var chainRec=null; try{ chainRec=PPO.chainRecOf(linkedPole); }catch(e){}
+  var fLine=null, fKv=null, fMark=null, fHangs=null, fMest=null, fAngle=null, fNote=null;
+  if(pm.type==="point"){
+    fLine=lineFieldEl("Линия / фидер", (linkedPole&&linkedPole.line) || pm.folder || "", snap);
+    fKv=selectEl("Класс напряжения, кВ", PPO.LISTS.kv,
+                 (linkedPole&&linkedPole.kv) || pm.kv || "", "— не выбран —");
+    fMark=markFieldEl(fKv, (linkedPole&&linkedPole.mark) || pm.mark || "");
+    d.appendChild(fLine); d.appendChild(fKv); d.appendChild(fMark);
+  }
+
+  var fType=multiSelect("Тип опоры",POLE_TYPES,pm.poleType);
+  var fDefect=multiSelect("Категория дефекта",DEFECT_OPTS,pm.defect,"defect");
+  d.appendChild(fType); d.appendChild(fDefect);
+
+  if(pm.type==="point"){
+    var more=document.createElement("details"); more.className="pop-more";
+    var sum=document.createElement("summary"); sum.textContent="Прочие характеристики опоры";
+    more.appendChild(sum);
+    fHangs=fieldEl("Существующих подвесов связи", String((linkedPole&&linkedPole.hangs)||""));
+    fHangs._input.type="number"; fHangs._input.min="0";
+    fMest=selectEl("Характер местности", PPO.LISTS.mestnost,
+                   (linkedPole&&linkedPole.mest)||"", "— не выбран —");
+    fAngle=fieldEl("Угол поворота линии, град", String((linkedPole&&linkedPole.angle)||""));
+    fAngle._input.type="number";
+    fNote=fieldEl("Примечание", (linkedPole&&linkedPole.note)||"");
+    [fHangs,fKv?fMest:null,fAngle,fNote].forEach(function(x){ if(x) more.appendChild(x); });
+    d.appendChild(more);
+    if(!linkedPole){
+      var nb=document.createElement("div"); nb.className="pop-hint";
+      nb.textContent="Метка ещё не перенесена в осмотр — характеристики сохранятся вместе с опорой при переносе.";
+      d.appendChild(nb);
+    }
+  }
+
+  /* Признаки цепи правятся и здесь, и в карточке опоры: значения одни и те же,
+     и запись идёт через общую точку ядра. Доступны только для метки, уже
+     ставшей опорой в осмотре, — иначе править нечего. */
+  var fEnd=null, fPrev=null, fNext=null;
+  if(pm.type==="point"){
+    if(linkedPole){
+      fEnd=chkEl("Конечная (концевая) опора — пролёт до следующей не считать", !!linkedPole.endPole);
+      fPrev=poleComboEl("Предыдущая опора", linkedPole, "prev", pm, snap, chainRec);
+      fNext=poleComboEl("Следующая опора", linkedPole, "next", pm, snap, chainRec);
+      d.appendChild(fEnd); d.appendChild(fPrev); d.appendChild(fNext);
+      var g=gapOf(pm);
+      if(g){
+        var gw=document.createElement("div"); gw.className="pop-gap";
+        gw.textContent=PPO.poleLinkGapText(g, linkedPole.endPole);
+        d.appendChild(gw);
+      }
+    } else {
+      var nl=document.createElement("div"); nl.className="pop-hint";
+      nl.textContent="Признак конца участка и соседние опоры задаются после переноса метки в осмотр.";
+      d.appendChild(nl);
+    }
+  }
+
+  var co=document.createElement("div"); co.className="pop-coord";
+  if(pm.type==="point") co.textContent=pm.rep[1].toFixed(6)+", "+pm.rep[0].toFixed(6);
+  else if(pm.type==="line") co.textContent="Линия · "+fmtLen(pm.length)+" · точек: "+pm.coords.length;
+  else co.textContent="Полигон · вершин: "+pm.coords.length;
+  d.appendChild(co);
+
+  var keys=Object.keys(pm.attrs).filter(k=>pm.attrs[k]!=="");
+  if(keys.length){ var kv=document.createElement("div"); kv.className="pop-kv";
+    keys.forEach(function(k){ var ke=document.createElement("span"); ke.className="k"; ke.textContent=k;
+      var ve=document.createElement("span"); ve.textContent=pm.attrs[k]; kv.appendChild(ke); kv.appendChild(ve); });
+    d.appendChild(kv); }
+
+  var act=document.createElement("div"); act.className="pop-act";
+  /* Видно заранее, под каким номером опора появится в разделе «Осмотр»:
+     раньше расхождение обнаруживалось только после перехода туда. */
+  function paintNameHint(){
+    var nm=nameInp.value.trim();
+    var manual=fPole._get();
+    var will=(nm!==name0 && manual===pole0) ? PPO.poleNumFromName(nm) : manual;
+    will=String(will||"").trim();
+    if(!will){ nameHint.textContent="Номер опоры не распознан — задайте его в поле ниже."; return; }
+    nameHint.textContent="В разделе «Осмотр» опора будет под номером: "+will+
+      (manual!==pole0 ? " (задан вручную)" : "");
+  }
+  nameInp.addEventListener("input",paintNameHint);
+  paintNameHint();
+
+  var save=document.createElement("button"); save.className="pop-save"; save.textContent="Сохранить";
+  save.onclick=function(){
+    /* На время сохранения обратная подстановка из осмотра приостановлена:
+       ниже объект записывается несколько раз (признаки цепи, характеристики
+       опоры), и каждая запись поднимала бы подтягивание, затирающее новый
+       номер метки ещё до переноса. */
+    pullMuted++;
+    var released=false;
+    function release(){ if(!released){ released=true; pullMuted=Math.max(0,pullMuted-1); } }
+    /* страховка: перенос не должен уметь оставить подтягивание выключенным */
+    setTimeout(release, 8000);
+    var newName=nameInp.value.trim()||pm.name;
+    var newPole=fPole._get();
+    /* Название изменили, а «Номер опоры» не трогали — номер перечитываем из
+       нового названия МЯГКИМ разбором. Строгий разбор понимает только полевой
+       формат подписи «номер:тип:линия»; на «Опора 93» и «оп. № 95» он давал
+       пустой номер, номер метки оставался прежним, и переименование до раздела
+       «Осмотр» не доходило. Явная правка поля «Номер опоры» главнее разбора. */
+    if(newName!==name0 && newPole===pole0){
+      var derived=PPO.poleNumFromName(newName);
+      if(derived) newPole=derived;
+    }
+    pm.name=newName;
+    pm.pole=newPole;
+    pm.poleType=fType._get();
+    pm.defect=fDefect._get();
+    pm.dirty=true;
+    /* характеристики метки: линия и класс нужны и самой карте — по ним
+       строятся подпись и перенос в осмотр */
+    if(fLine) pm.folder=fLine._get();
+    if(fKv)   pm.kv=fKv._get();
+    if(fMark) pm.mark=fMark._get();
+    /* признаки цепи пишем до переноса: перенос затем пересчитает пролёты */
+    if(linkedPole && fEnd){
+      try{
+        PPO.setPoleLinks(linkedPole.id, {
+          endPole: fEnd._get() ? 1 : 0,
+          prevId:  fPrev._get(),
+          nextId:  fNext._get()
+        });
+      }catch(e){}
+    }
+    /* характеристики опоры в осмотре: пишем через общую точку ядра */
+    function applyPoleFields(id){
+      if(!id) return;
+      try{
+        PPO.updatePoleFields(id, {
+          line:  fLine ? fLine._get() : undefined,
+          kv:    fKv   ? fKv._get()   : undefined,
+          mark:  fMark ? fMark._get() : undefined,
+          hangs: fHangs? fHangs._get(): undefined,
+          mest:  fMest ? fMest._get() : undefined,
+          angle: fAngle? fAngle._get(): undefined,
+          note:  fNote ? fNote._get() : undefined
+        });
+      }catch(e){}
+    }
+    if(linkedPole) applyPoleFields(linkedPole.id);
+    refreshGaps();
+    renderList(); updatePmVisual(pm); map.closePopup();
+    saveMapState();
+    if(pm.type==="point" && !guessPoleNumber(pm)){
+      /* без номера опоры сопоставлять не с чем — раньше правка молча терялась */
+      release();
+      toast("Сохранено на карте, но в осмотр не перенесено: не заполнен «Номер опоры»", true);
+      return;
+    }
+    if(autoSync && pm.type==="point"){
+      var renamed=(newPole!==pole0);
+      syncOne(pm).then(function(r){
+        /* опора могла быть создана только что — характеристики дописываем после */
+        if(!linkedPole) applyPoleFields(pm.poleId);
+        release();
+        refreshAllVisual();
+        toast(r.added?"Сохранено · создана опора в осмотре"
+             :(r.updated?("Сохранено · опора в осмотре обновлена"+(renamed?": № "+newPole:""))
+                        :"Сохранено · в осмотре без изменений"));
+      }, function(){ release(); });
+    } else {
+      release();
+      toast(hasDefect(pm)?"Сохранено на карте · дефект отмечен. Не забудьте «→ В осмотр»"
+                         :"Сохранено на карте. Не забудьте «→ В осмотр»");
+    }
+  };
+  var del=document.createElement("button"); del.className="pop-del"; del.textContent="Удалить";
+  del.onclick=function(){ deletePm(pm.id); };
+  act.appendChild(save); act.appendChild(del); d.appendChild(act);
+
+  if(pm.type==="point"){ var hint=document.createElement("div"); hint.className="pop-coord"; hint.style.marginTop="8px";
+    hint.textContent=(tool==="move"||tool==="point")?"Перетащите метку — координаты обновятся.":"Включите «Двигать / править», чтобы перетаскивать.";
+    d.appendChild(hint); }
+  return d;
+}
+
+/* ===== ПРОСМОТР ФОТО (с зумом) ===== */
+var lbScale=1, lbTx=0, lbTy=0, lbPointers=new Map(), lbLastDist=0, lbPanStart=null, lbTapTime=0;
+function lbImgEl(){ return document.getElementById("lbImg"); }
+function lbApply(){ lbImgEl().style.transform="translate("+lbTx+"px,"+lbTy+"px) scale("+lbScale+")"; }
+function lbZoomReset(){ lbScale=1; lbTx=0; lbTy=0; lbApply(); }
+function lbSetScale(s){ lbScale=Math.min(6,Math.max(1,s)); if(lbScale<=1){ lbScale=1; lbTx=0; lbTy=0; } lbApply(); }
+function lbZoom(dir){ lbSetScale(lbScale*(dir>0?1.4:1/1.4)); }
+/* снимок данных для подписи фотографии: читается один раз при открытии */
+function snapForPhoto(){ try{ return PPO.load(); }catch(e){ return null; } }
+/* Подпись фотографии. В разделе «Осмотр» снимок подписан опорой и линией —
+   на карте раньше было только имя файла, и в отрыве от карточки понять, к чему
+   относится снимок, было нельзя. */
+var lbTitle="";
+function photoTitleOf(pm,snap){
+  if(!pm || pm.type!=="point") return "";
+  var p=poleOfMark(pm,snap);
+  var num=String((p&&p.num) || guessPoleNumber(pm) || "").trim();
+  var ln=String((p&&p.line) || pm.folder || "").trim();
+  var parts=[];
+  if(num) parts.push("Опора № "+num);
+  if(ln) parts.push(ln);
+  if(p&&p.mark) parts.push(p.mark);
+  return parts.join("  ·  ");
+}
+function openLightbox(photos,i,title){
+  lbPhotos=photos||[]; lbIndex=i||0; lbTitle=title||"";
+  document.getElementById("lightbox").classList.add("on"); showLb();
+}
+function showLb(){ if(!lbPhotos.length) return; var ph=lbPhotos[lbIndex];
+  lbImgEl().src=ph.url; lbZoomReset();
+  var cap=document.getElementById("lbCap");
+  cap.innerHTML="";
+  if(lbTitle){
+    var t=document.createElement("b"); t.className="lb-obj"; t.textContent=lbTitle;
+    cap.appendChild(t);
+  }
+  var sub=document.createElement("span"); sub.className="lb-sub";
+  sub.textContent=(ph.name||"фото")+"  ·  "+(lbIndex+1)+" / "+lbPhotos.length+
+    "  ·  колесо / щипок — зум, двойной тап — приблизить";
+  cap.appendChild(sub);
+  var multi=lbPhotos.length>1;
+  document.querySelector(".lb-prev").style.display=multi?"block":"none";
+  document.querySelector(".lb-next").style.display=multi?"block":"none";
+}
+function lbNext(){ if(lbPhotos.length){ lbIndex=(lbIndex+1)%lbPhotos.length; showLb(); } }
+function lbPrev(){ if(lbPhotos.length){ lbIndex=(lbIndex-1+lbPhotos.length)%lbPhotos.length; showLb(); } }
+function closeLightbox(){ document.getElementById("lightbox").classList.remove("on"); lbImgEl().src=""; lbZoomReset(); }
+function lbDist(){ var p=Array.from(lbPointers.values()); return Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y); }
+function initLightbox(){
+  var stage=document.getElementById("lbStage"), img=lbImgEl();
+  stage.addEventListener("wheel",function(e){ e.preventDefault(); lbSetScale(lbScale*(e.deltaY<0?1.15:1/1.15)); },{passive:false});
+  stage.addEventListener("pointerdown",function(e){ stage.setPointerCapture(e.pointerId); lbPointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(lbPointers.size===1){ lbPanStart={x:e.clientX-lbTx,y:e.clientY-lbTy}; img.classList.add("grabbing");
+      var now=Date.now(); if(now-lbTapTime<300) lbSetScale(lbScale>1?1:2.5); lbTapTime=now; }
+    else if(lbPointers.size===2){ lbLastDist=lbDist(); } });
+  stage.addEventListener("pointermove",function(e){ if(!lbPointers.has(e.pointerId)) return; lbPointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(lbPointers.size===2){ var d=lbDist(); if(lbLastDist) lbSetScale(lbScale*(d/lbLastDist)); lbLastDist=d; }
+    else if(lbPointers.size===1 && lbScale>1 && lbPanStart){ lbTx=e.clientX-lbPanStart.x; lbTy=e.clientY-lbPanStart.y; lbApply(); } });
+  function up(e){ lbPointers.delete(e.pointerId); if(lbPointers.size<2) lbLastDist=0;
+    if(lbPointers.size===1){ var p=Array.from(lbPointers.values())[0]; lbPanStart={x:p.x-lbTx,y:p.y-lbTy}; } else { img.classList.remove("grabbing"); } }
+  stage.addEventListener("pointerup",up); stage.addEventListener("pointercancel",up);
+  document.addEventListener("keydown",function(e){
+    if(!document.getElementById("lightbox").classList.contains("on")) return;
+    if(e.key==="Escape") closeLightbox(); else if(e.key==="ArrowRight") lbNext(); else if(e.key==="ArrowLeft") lbPrev();
+    else if(e.key==="+"||e.key==="=") lbZoom(1); else if(e.key==="-") lbZoom(-1); });
+}
+function deletePm(id){
+  var i=placemarks.findIndex(p=>p.id===id); if(i<0) return;
+  var pm=placemarks[i];
+  /* Метка на карте и опора в осмотре — один объект. Раньше удаление убирало
+     метку только с карты, а опора оставалась в осмотре, участвовала в цепи
+     пролётов и попадала в отчёт. Спрашиваем и удаляем разом. */
+  var alsoPole=false;
+  if(pm.type==="point" && guessPoleNumber(pm)){
+    var nm=guessPoleNumber(pm);
+    alsoPole=confirm("Удалить метку «"+(pm.name||nm)+"»?\n\n"+
+      "Опора № "+nm+" будет удалена и в разделе «Осмотр» — вместе с её характеристиками, "+
+      "координатами и признаками.\n\nОК — удалить везде. Отмена — не удалять.");
+    if(!alsoPole) return;
+  }
+  var res=null;
+  if(alsoPole){
+    try{ res=PPO.deletePoleForMark(markPayload(pm)); }catch(e){ res=null; }
+  }
+  if(pm.type==="point"){ var k=coordKey(pm.rep); if(pointIndex[k]===pm) delete pointIndex[k]; }
+  if(pm.layer) featureLayer.removeLayer(pm.layer);
+  map.closePopup(); placemarks.splice(i,1);
+  refreshGaps(); renderList(); updateStats();
+  saveMapState();
+  if(res && res.removed){
+    toast("Удалено: метка и опора № "+res.num+" в осмотре"+
+      (res.relinked?" · снято ссылок соседей: "+res.relinked:"")+
+      (res.meas?" · измерений по этой опоре осталось: "+res.meas:""));
+  } else {
+    toast("Метка удалена с карты");
+  }
+}
+
+/* ===== ИНСТРУМЕНТЫ ===== */
+function setTool(t){
+  if(tool==="line" && drawVertices.length) cancelLine();
+  tool = (tool===t)?"none":t;
+  ["Move","Point","Line"].forEach(function(x){ document.getElementById("tool"+x).classList.remove("on"); });
+  if(tool!=="none") document.getElementById("tool"+cap(tool)).classList.add("on");
+  var canDrag=(tool==="move"||tool==="point");
+  placemarks.forEach(function(pm){ if(pm.type==="point"&&pm.layer&&pm.layer.dragging){ canDrag?pm.layer.dragging.enable():pm.layer.dragging.disable(); } });
+  var hint=document.getElementById("toolHint");
+  if(tool==="move") hint.textContent="Перетаскивайте точки — координаты пересчитаются. Клик по метке — переименование/удаление.";
+  else if(tool==="point") hint.textContent="Кликните по карте, чтобы поставить точку. Её можно перетащить и переименовать.";
+  else if(tool==="line"){ hint.textContent="Кликайте по карте, добавляя вершины. «Готово» — завершить линию."; drawVertices=[]; document.getElementById("drawbar").classList.add("on"); updateDrawbar(); }
+  else hint.textContent="Выберите инструмент. Карточка метки открывается кликом.";
+  if(tool!=="line"){ document.getElementById("drawbar").classList.remove("on"); tool==="line"||clearDrawTemp(); }
+  tool==="line"?map.doubleClickZoom.disable():map.doubleClickZoom.enable();
+  map.getContainer().style.cursor=(tool==="point"||tool==="line")?"crosshair":"";
+}
+function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
+
+function addPointAt(latlng){
+  var pm=addPlacemark({name:"Точка "+(countType("point")+1),type:"point",coords:[[latlng.lng,latlng.lat,0]],attrs:{}},true);
+  pm.layer.openPopup();
+}
+/* ---- рисование линии ---- */
+function renderDrawTemp(){
+  clearDrawTemp();
+  if(!drawVertices.length) return;
+  drawTemp=L.polyline(drawVertices.map(c=>[c[1],c[0]]),{color:lineColor,weight:3,dashArray:"6 5"}).addTo(map);
+  drawVertices.forEach(function(c){ drawDots.push(L.circleMarker([c[1],c[0]],{radius:4,color:"#111",fillColor:lineColor,fillOpacity:1,weight:1.5}).addTo(map)); });
+}
+function addVertex(latlng){ drawVertices.push([latlng.lng,latlng.lat]); renderDrawTemp(); updateDrawbar(); }
+function undoVertex(){ if(!drawVertices.length) return; drawVertices.pop(); renderDrawTemp(); updateDrawbar(); }
+function refreshDrawColor(){ if(tool==="line") renderDrawTemp(); }
+function updateDrawbar(){ document.getElementById("drawLen").textContent=fmtLen(lineLength(drawVertices.map(c=>[c[0],c[1],0]))); }
+function clearDrawTemp(){ if(drawTemp){ map.removeLayer(drawTemp); drawTemp=null; } drawDots.forEach(m=>map.removeLayer(m)); drawDots=[]; }
+function finishLine(){
+  if(drawVertices.length<2){ toast("Нужно минимум 2 точки.",true); return; }
+  var coords=drawVertices.map(c=>[c[0],c[1],0]);
+  var pm=addPlacemark({name:"Линия "+(countType("line")+1),type:"line",coords:coords,attrs:{},color:lineColor},true);
+  clearDrawTemp(); drawVertices=[]; updateDrawbar();
+  toast("Линия создана · "+fmtLen(pm.length));
+  pm.layer.openPopup();
+}
+function initPalette(){
+  var p=document.getElementById("palette"); if(!p) return;
+  PALETTE.forEach(function(c){ var s=document.createElement("div"); s.className="sw"+(c===lineColor?" on":""); s.style.background=c; s.dataset.c=c; s.title=c;
+    s.onclick=function(){ lineColor=c; document.getElementById("colorPick").value=c; markSwatch(); refreshDrawColor(); }; p.appendChild(s); });
+  var inp=document.createElement("input"); inp.type="color"; inp.id="colorPick"; inp.value=lineColor; inp.title="Свой цвет";
+  inp.oninput=function(){ lineColor=inp.value; markSwatch(); refreshDrawColor(); }; p.appendChild(inp);
+}
+function markSwatch(){ var p=document.getElementById("palette"); if(!p) return;
+  Array.prototype.forEach.call(p.children,function(el){ if(el.dataset&&el.dataset.c) el.classList.toggle("on", el.dataset.c===lineColor); }); }
+function cancelLine(){ clearDrawTemp(); drawVertices=[]; updateDrawbar(); }
+function countType(t){ return placemarks.filter(p=>p.type===t).length; }
+
+/* ===== ФОТО С ГЕОЛОКАЦИЕЙ → МЕТКИ ===== */
+function processPhotos(files){
+  if(typeof exifr==="undefined"){ toast("Библиотека EXIF не загрузилась. Проверьте соединение.",true); return; }
+  toast("Читаю геометки из фото…");
+  var arr=Array.prototype.slice.call(files), added=0, skipped=[], done=0;
+  arr.forEach(function(file){
+    exifr.gps(file).then(function(g){
+      if(g && isFinite(g.latitude) && isFinite(g.longitude)){
+        var url=URL.createObjectURL(file), ext=(file.name.split(".").pop()||"jpg").toLowerCase();
+        var nm=file.name.replace(/\.[^.]+$/,"");
+        var pm=addPlacemark({name:nm,type:"point",coords:[[g.longitude,g.latitude, g.altitude||0]],
+          attrs:{"Файл":file.name},photos:[{url:url,blob:file,ext:ext,name:file.name}]},true);
+        added++;
+      } else skipped.push(file.name);
+    }).catch(function(){ skipped.push(file.name); }).then(function(){
+      done++;
+      if(done===arr.length){
+        if(added){ fitAll(); document.getElementById("exportBtn").disabled=false; document.getElementById("kmzBtn").disabled=false; }
+        var msg="Добавлено меток: "+added;
+        if(skipped.length) msg+=" · без геометки: "+skipped.length;
+        toast(msg, added===0);
+        if(added) setTool("move");
+      }
+    });
+  });
+}
+
+/* ===== СПИСОК / СТАТИСТИКА ===== */
+function renderList(){
+  var q=(document.getElementById("search").value||"").toLowerCase().trim();
+  var box=document.getElementById("rows");
+  var f=placemarks.filter(function(pm){ if(!q) return true;
+    if(pm.name.toLowerCase().indexOf(q)>=0||pm.folder.toLowerCase().indexOf(q)>=0) return true;
+    for(var k in pm.attrs){ if(String(pm.attrs[k]).toLowerCase().indexOf(q)>=0) return true; } return false; });
+  if(!f.length){ box.innerHTML='<div class="morerows">Ничего не найдено.</div>'; return; }
+  var html="";
+  f.slice(0,LIST_LIMIT).forEach(function(pm){
+    var df=hasDefect(pm);
+    var cls=df?"g-defect":(pm.type==="point"?"g-point":pm.type==="line"?"g-line":"g-poly");
+    var extra=(df?pm.defect:typeLabel(pm.type));
+    var meta=(pm.folder?esc(pm.folder)+" · ":"")+esc(extra)+(pm.type==="line"?" · "+fmtLen(pm.length):" · "+pm.rep[1].toFixed(5)+", "+pm.rep[0].toFixed(5));
+    html+='<div class="rowitem" onclick="focusPm('+pm.id+')"><div class="rn"><span class="gdot '+cls+'"></span>'+(df?'<span class="warn">!</span> ':'')+esc(pm.name)+(pm.photos.length?' <span class="cam">📷</span>':'')+'</div><div class="rmeta">'+meta+'</div></div>';
+  });
+  if(f.length>LIST_LIMIT) html+='<div class="morerows">Показано '+LIST_LIMIT+' из '+f.length+'. В выгрузку попадут все.</div>';
+  box.innerHTML=html;
+}
+function focusPm(id){ var pm=placemarks.find(p=>p.id===id); if(!pm||!pm.layer) return;
+  if(pm.type==="point") map.setView([pm.rep[1],pm.rep[0]],Math.max(map.getZoom(),16));
+  else map.fitBounds(pm.layer.getBounds(),{padding:[40,40]});
+  pm.layer.openPopup(); if(window.innerWidth<=860) setView("map");
+}
+function updateStats(){
+  var p=0,l=0,g=0,ph=0;
+  placemarks.forEach(function(pm){ if(pm.type==="point")p++; else if(pm.type==="line")l++; else g++; ph+=(pm.photos?pm.photos.length:0); });
+  document.getElementById("cPoint").textContent=p; document.getElementById("cLine").textContent=l;
+  document.getElementById("cPoly").textContent=g; document.getElementById("cPhoto").textContent=ph;
+  var has=placemarks.length>0;
+  document.getElementById("exportBtn").disabled=!has; document.getElementById("kmzBtn").disabled=!has;
+  var toO=document.getElementById("toOsmotr"); if(toO) toO.disabled=!has;
+  if(typeof updateSyncBadge==="function") updateSyncBadge();
+  refreshAttrKeys();
+}
+function refreshAttrKeys(){ var seen={},order=[];
+  placemarks.forEach(function(pm){ for(var k in pm.attrs){ if(seen[k]===undefined){ seen[k]=1; order.push(k); } } }); attrKeys=order;
+}
+function fitAll(){ if(!placemarks.length) return; try{ map.fitBounds(featureLayer.getBounds(),{padding:[40,40]}); }catch(e){} }
+
+/* ===== ГЕОМЕТРИЯ ===== */
+function haversine(a,b){ var R=6371000,t=Math.PI/180;
+  var dLa=(b[1]-a[1])*t,dLn=(b[0]-a[0])*t,la1=a[1]*t,la2=b[1]*t;
+  var h=Math.sin(dLa/2)*Math.sin(dLa/2)+Math.cos(la1)*Math.cos(la2)*Math.sin(dLn/2)*Math.sin(dLn/2);
+  return 2*R*Math.asin(Math.min(1,Math.sqrt(h)));
+}
+function lineLength(coords){ var s=0; for(var i=1;i<coords.length;i++) s+=haversine(coords[i-1],coords[i]); return s; }
+function fmtLen(m){ return m>=1000 ? (m/1000).toFixed(2)+" км" : Math.round(m)+" м"; }
+function nearestOrder(items){
+  if(items.length<3) return items.slice();
+  var n=items.length, used=new Array(n).fill(false), start=0;
+  for(var i=1;i<n;i++){ var a=items[i].rep,b=items[start].rep; if(a[1]>b[1]||(a[1]===b[1]&&a[0]<b[0])) start=i; }
+  var order=[items[start]]; used[start]=true; var cur=start;
+  for(var k=1;k<n;k++){ var best=-1,bd=Infinity;
+    for(var j=0;j<n;j++){ if(used[j])continue; var d=haversine(items[cur].rep,items[j].rep); if(d<bd){bd=d;best=j;} }
+    used[best]=true; order.push(items[best]); cur=best;
+  }
+  return order;
+}
+function exportOrder(){
+  var list=placemarks.slice();
+  if(document.getElementById("nnOrder").checked && list.length>=3 && list.length<=6000) return nearestOrder(list);
+  return list;
+}
+
+/* ===== ВЫГРУЗКА В EXCEL ===== */
+function exportExcel(){
+  if(!placemarks.length){ toast("Нет данных.",true); return; }
+  refreshAttrKeys();
+  var ordered=exportOrder();
+  var head=["№ маршрута","Папка","Имя","Номер опоры","Тип опоры","Категория дефекта","Тип объекта","Широта","Долгота","Высота, м","Кол-во точек","Фото, шт."].concat(attrKeys);
+  var aoa=[head];
+  ordered.forEach(function(pm,idx){
+    var row=[idx+1,pm.folder,pm.name,pm.pole||"",pm.poleType||"",pm.defect||"",typeLabel(pm.type),+pm.rep[1].toFixed(7),+pm.rep[0].toFixed(7),pm.coords[0][2]||0,pm.coords.length,(pm.photos?pm.photos.length:0)];
+    attrKeys.forEach(function(k){ row.push(pm.attrs[k]!==undefined?pm.attrs[k]:""); });
+    aoa.push(row);
+  });
+  var ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"]=[{wch:11},{wch:22},{wch:28},{wch:13},{wch:16},{wch:20},{wch:11},{wch:12},{wch:12},{wch:10},{wch:11},{wch:9}].concat(attrKeys.map(()=>({wch:20})));
+  ws["!autofilter"]={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:0,c:head.length-1}})};
+  var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Метки KMZ");
+  XLSX.writeFile(wb,"metki_"+stamp()+".xlsx");
+  toast("Excel сформирован ("+ordered.length+" строк).");
+}
+
+/* ===== ВЫГРУЗКА В KMZ ===== */
+function exportKMZ(){
+  if(!placemarks.length){ toast("Нет данных.",true); return; }
+  var ordered=exportOrder(), zip=new JSZip(), tasks=[], imgIdx=0;
+  var body=ordered.map(function(pm){
+    var imgTags="";
+    (pm.photos||[]).forEach(function(ph){
+      if(ph.blob){ var fn="files/img_"+(++imgIdx)+"."+(ph.ext||"jpg"); zip.file(fn,ph.blob); imgTags+='<img src="'+fn+'" width="400"/><br/>'; }
+      else if(ph.remote||ph.origSrc){ imgTags+='<img src="'+esc(ph.origSrc||ph.url)+'" width="400"/><br/>'; }
+    });
+    var pairs=[];
+    if(pm.pole) pairs.push(["Номер опоры",pm.pole]);
+    if(pm.poleType) pairs.push(["Тип опоры",pm.poleType]);
+    if(pm.defect) pairs.push(["Категория дефекта",pm.defect]);
+    Object.keys(pm.attrs).filter(k=>pm.attrs[k]!=="").forEach(function(k){ pairs.push([k,pm.attrs[k]]); });
+    var tbl=pairs.map(function(p){ return "<tr><td><b>"+esc(p[0])+"</b></td><td>"+esc(String(p[1]))+"</td></tr>"; }).join("");
+    var desc="<![CDATA["+(tbl?"<table>"+tbl+"</table>":"")+imgTags+"]]>";
+    var ed=pairs.map(function(p){ return '<Data name="'+esc(p[0])+'"><value>'+esc(String(p[1]))+'</value></Data>'; }).join("");
+    var style="";
+    if(pm.type==="line") style='<Style><LineStyle><color>'+hexToKml(strokeOf(pm))+'</color><width>3</width></LineStyle></Style>';
+    else if(pm.type==="poly") style='<Style><LineStyle><color>'+hexToKml(strokeOf(pm))+'</color><width>2</width></LineStyle><PolyStyle><color>66'+hexToKml(strokeOf(pm)).slice(2)+'</color></PolyStyle></Style>';
+    var geom=geomKML(pm);
+    return "<Placemark><name>"+esc(pm.name)+"</name>"+style+"<description>"+desc+"</description>"+(ed?"<ExtendedData>"+ed+"</ExtendedData>":"")+geom+"</Placemark>";
+  }).join("\n");
+  var kml='<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Метки '+stamp()+'</name>\n'+body+'\n</Document></kml>';
+  zip.file("doc.kml",kml);
+  zip.generateAsync({type:"blob"}).then(function(blob){
+    var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="metki_"+stamp()+".kmz";
+    document.body.appendChild(a); a.click(); a.remove();
+    toast("KMZ сформирован ("+ordered.length+" объектов, фото: "+imgIdx+").");
+  }).catch(function(err){ toast("Ошибка KMZ: "+err.message,true); });
+}
+function geomKML(pm){
+  var c=pm.coords.map(function(p){ return p[0]+","+p[1]+","+(p[2]||0); }).join(" ");
+  if(pm.type==="point") return "<Point><coordinates>"+c+"</coordinates></Point>";
+  if(pm.type==="line") return "<LineString><tessellate>1</tessellate><coordinates>"+c+"</coordinates></LineString>";
+  return "<Polygon><outerBoundaryIs><LinearRing><coordinates>"+c+"</coordinates></LinearRing></outerBoundaryIs></Polygon>";
+}
+
+/* ===== УТИЛИТЫ ===== */
+function typeLabel(t){ return t==="point"?"Точка":t==="line"?"Линия":"Полигон"; }
+function esc(s){ return String(s).replace(/[&<>"']/g,function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+function stamp(){ return new Date().toISOString().slice(0,10); }
+var toastEl=document.getElementById("toast"),toastT;
+function toast(m,e){ toastEl.textContent=m; toastEl.classList.toggle("err",!!e); toastEl.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>toastEl.classList.remove("show"),3400); }
+function setView(v){ var app=document.getElementById("app"); app.className="view-"+v;
+  document.getElementById("tabList").classList.toggle("on",v==="list"); document.getElementById("tabMap").classList.toggle("on",v==="map");
+  if(v==="map") setTimeout(()=>map.invalidateSize(),50); }
+window.addEventListener("resize",()=>{ if(map) map.invalidateSize(); });
+buildMap();
+initPalette();
+initLightbox();
+
+/* восстановление сохранённых меток и подхват правок из осмотра */
+function saveMapNow(){
+  if(!placemarks.length){ toast("Меток нет — сохранять нечего.", true); return; }
+  saveMapState();
+  toast("Карта сохранена в браузере: меток "+placemarks.length+". Правки не пропадут при перезагрузке.");
+}
+(function(){
+  var restored = false;
+  try{ restored = restoreMapState(); }catch(e){ restored = false; }
+  if(restored){
+    setTimeout(function(){
+      fitAll();
+      var r = pullFromOsmotr(true);
+      var msg = "Восстановлено меток: "+placemarks.length;
+      if(r.updated || r.added) msg += " · из осмотра подтянуто: обновлено "+r.updated+", добавлено "+r.added;
+      toast(msg);
+    }, 300);
+  }
+  /* осмотр правится в соседней вкладке — подхватываем без перезагрузки */
+  document.addEventListener("ppo:saved", function(){
+    if(!autoSync || !placemarks.length) return;
+    /* Пока сохраняется карточка метки, подтягивать из осмотра нельзя: правка
+       характеристик записывает объект раньше переноса, и обратная подстановка
+       возвращала метке прежний номер — переименование на карте не доходило
+       до раздела «Осмотр». */
+    if(pullMuted) return;
+    pullFromOsmotr(true);
+  });
+  /* Ядро сообщило, что объект изменён в другой вкладке. Кэш к этому моменту
+     уже сброшен, поэтому PPO.load() вернёт актуальные данные. Счётчик опор
+     обновляем всегда, подтягивание меток — только при автосинхронизации. */
+  document.addEventListener("ppo:external", function(){
+    updateSyncBadge();
+    if(autoSync && placemarks.length) pullFromOsmotr(true);
+  });
+  window.addEventListener("storage", function(e){
+    if(!autoSync || !e || e.key !== "ppo_vols_object_v2") return;
+    if(placemarks.length) pullFromOsmotr(true);
+  });
+  window.addEventListener("beforeunload", function(){
+    if(placemarks.length){ clearTimeout(saveTimer); saveMapState(); }
+  });
+})();
+
+/* ===== ОБМЕН С ОСМОТРОМ =====
+   Метки-точки становятся карточками опор: номер, тип, категория дефекта, координаты. */
+PPO.mountNav("karta.html");
+
+/* стартовое состояние переключателя и индикатора синхронизации */
+(function(){
+  var b=document.getElementById("autoSyncBtn");
+  if(b){ b.classList.toggle("on",autoSync);
+         b.textContent=autoSync?"⇄ Синхронизация: авто":"⇄ Синхронизация: вручную"; }
+  updateSyncBadge();
+})();
+
+/* Номер опоры по подписи метки.
+   Раньше номером считались ЛЮБЫЕ цифры в конце подписи. Из-за этого номер
+   вытаскивался откуда попало — из названия населённого пункта, из даты, из
+   имени файла, — и разные точки получали одинаковый «номер». При переносе
+   в осмотр они сливались в одну опору: координаты перезаписывались последней
+   меткой, а фотографии всех точек скапливались в одной карточке.
+   Теперь используется тот же разбор подписи, что и при импорте KMZ через
+   «Поток» (PPOKMZ.parseLabel): он принимает номер только в начале подписи и
+   только если это действительно номер. Что не разобралось — номера не
+   получает и в осмотр молча не уходит. */
+function guessPoleNumber(pm){
+  if(pm.pole) return String(pm.pole).trim();
+  if(typeof PPOKMZ !== "undefined" && PPOKMZ.parseLabel){
+    var r = PPOKMZ.parseLabel(pm.name||"", "");
+    if(r && r.pole) return String(r.num).trim();
+    return "";
+  }
+  /* eslint-disable-next-line */
+  /* запасной разбор, если справочный модуль не подключён */
+  var m=String(pm.name||"").match(/^\s*(\d+[\d\/\-–]*)\b/);
+  return m ? m[1] : "";
+}
+function guessMark(pm, kv){
+  var t=String(pm.poleType||"").toLowerCase();
+  if(!t) return "";
+  var arr = kv ? PPO.polesByKv(kv) : PPO.POLES;
+  var hit = arr.filter(function(o){ return o.type.toLowerCase().indexOf(t)===0; })[0]
+         || arr.filter(function(o){ return o.type.toLowerCase().indexOf(t)>=0; })[0];
+  return hit ? hit.mark : "";
+}
+
+/* ===== СОХРАНЕНИЕ СОСТОЯНИЯ КАРТЫ =====
+   Метки жили только в памяти: после перезагрузки страницы правки пропадали.
+   Теперь состояние пишется в localStorage. Фотографии в него не кладутся —
+   они тяжёлые и уже хранятся в базе осмотра; сохраняются только ссылки
+   (storedId), по которым снимки подтягиваются обратно. */
+var MAP_KEY = 'ppo_map_state_v1';
+var saveTimer = null;
+
+function serializePm(pm, lean){
+  var o = { id:pm.id, name:pm.name, folder:pm.folder, type:pm.type,
+    coords:pm.coords, rep:pm.rep, color:pm.color||null,
+    pole:pm.pole||'', poleType:pm.poleType||'', defect:pm.defect||'',
+    poleId:pm.poleId||'', kv:pm.kv||'', mark:pm.mark||'', dirty:!!pm.dirty,
+    photoIds:(pm.photos||[]).map(function(ph){ return ph.storedId; }).filter(Boolean) };
+  /* в облегчённом режиме не тащим произвольные атрибуты KMZ — они самые объёмные */
+  if(!lean) o.attrs = pm.attrs || {};
+  return o;
+}
+/* Кэш карты не должен вытеснять данные осмотра: они первичны, а хранилище общее.
+   Держимся в пределах ~1 МБ, при нехватке — сначала облегчаем, потом отказываемся
+   от кэша совсем, но обязательно предупреждаем. */
+var MAP_BUDGET = 1000000;
+
+function packMapState(lean){
+  return JSON.stringify({ v:1, at:new Date().toISOString(), seq:pmSeq,
+    base:currentBaseName, names:loadedNames, lean:!!lean,
+    marks: placemarks.map(function(pm){ return serializePm(pm, lean); }) });
+}
+function saveMapState(){
+  var body = packMapState(false), lean = false;
+  if(body.length > MAP_BUDGET){ body = packMapState(true); lean = true; }
+  try{
+    localStorage.setItem(MAP_KEY, body);
+    if(lean && !saveMapState._warned){
+      saveMapState._warned = true;
+      toast("Меток много — карта сохраняется в облегчённом виде: описания из KMZ не запоминаются. Метки, номера, дефекты и фото сохраняются полностью.");
+    }
+  }catch(e){
+    /* места нет — кэш карты убираем, чтобы не мешать сохранению осмотра */
+    try{ localStorage.removeItem(MAP_KEY); }catch(e2){}
+    if(!saveMapState._quotaWarned){
+      saveMapState._quotaWarned = true;
+      toast("Не хватает места в браузере: карта не сохраняется между сеансами. Данные осмотра важнее и сохраняются в первую очередь. Выгрузите метки кнопкой «Сохранить KMZ» или перенесите их в осмотр.", true);
+    }
+  }
+  updateSyncBadge();
+}
+/* отложенная запись — чтобы не писать на каждый пиксель при перетаскивании */
+function scheduleSave(){ clearTimeout(saveTimer); saveTimer = setTimeout(saveMapState, 400); }
+
+function restoreMapState(){
+  var raw;
+  try{ raw = localStorage.getItem(MAP_KEY); }catch(e){ return false; }
+  if(!raw) return false;
+  var st;
+  try{ st = JSON.parse(raw); }catch(e){ return false; }
+  if(!st || !st.marks || !st.marks.length) return false;
+
+  pmSeq = st.seq || 0;
+  loadedNames = st.names || [];
+  st.marks.forEach(function(m){
+    var pm = { id:m.id, name:m.name, folder:m.folder, type:m.type,
+      coords:m.coords, rep:m.rep, attrs:m.attrs||{}, photos:[], length:0,
+      pole:m.pole||'', poleType:m.poleType||'', defect:m.defect||'',
+      poleId:m.poleId||'', kv:m.kv||'', mark:m.mark||'', dirty:!!m.dirty, color:m.color||null,
+      _photoIds:(m.photoIds||[]) };
+    if(pm.type==='line') pm.length = lineLength(pm.coords);
+    placemarks.push(pm);
+    if(pm.type==='point') pointIndex[coordKey(pm.rep)] = pm;
+    if(pm.id > pmSeq) pmSeq = pm.id;
+  });
+  redraw();
+  restorePhotos();
+  return true;
+}
+/* возврат снимков к меткам из базы осмотра */
+function restorePhotos(){
+  var need = placemarks.filter(function(pm){ return (pm._photoIds||[]).length; });
+  if(!need.length) return;
+  need.reduce(function(ch, pm){
+    return ch.then(function(){
+      return (pm._photoIds||[]).reduce(function(c, id){
+        return c.then(function(){
+          return PPO.photoGet(id).then(function(rec){
+            if(rec && rec.blob) pm.photos.push({ url:URL.createObjectURL(rec.blob),
+              blob:rec.blob, ext:'jpg', storedId:id, name:'фото '+(pm.photos.length+1)+'.jpg' });
+          }).catch(function(){});
+        });
+      }, Promise.resolve()).then(function(){ delete pm._photoIds; });
+    });
+  }, Promise.resolve()).then(function(){ redraw(); });
+}
+function clearMapState(){ try{ localStorage.removeItem(MAP_KEY); }catch(e){} }
+
+/* ===== СКВОЗНАЯ СИНХРОНИЗАЦИЯ С РАЗДЕЛОМ «ОСМОТР → ОПОРЫ» =====
+   Обе стороны правят один и тот же набор опор. Сопоставление ведёт ядро
+   (PPO.syncMarksToPoles) по паре «линия + номер», при их отсутствии — по
+   координатам. Ручные правки в «Осмотре» (марка, пролёт, класс) не затираются. */
+var autoSync = (localStorage.getItem("ppo_map_autosync") !== "0");
+
+/* ===== ЕДИНЫЙ РАЗБОР ОБХОДА =====
+   Раздел «Карта» и раздел «Импорт KMZ» обязаны давать в осмотре один и тот же
+   результат: важно, что за данные, а не каким путём их загрузили. Раньше карта
+   разбирала метки по-своему — линией считалась папка KML, класс напряжения
+   брался общий по объекту, марка и примечание не переносились вовсе, а дефект
+   читался только из явного поля, которого в полевом KMZ обычно нет.
+   Теперь метки прогоняются через тот же модуль PPOKMZ, что и импорт: подпись
+   разбирается по схеме «номер : марка : линия : примечание», линия наследуется
+   от предыдущей метки в порядке обхода, класс определяется по линии или марке,
+   а категория дефекта — по ключевым словам замечания. */
+function interpretMarks(){
+  var pts = placemarks.filter(function(pm){ return pm.type==="point"; });
+  if(typeof PPOKMZ === "undefined" || !PPOKMZ.interpretPoints) return null;
+  var points = pts.map(function(pm){
+    return { id:"pm"+pm.id, raw: pm.pole ? String(pm.pole) : (pm.name||""),
+             folder: pm.folder||"", when: pm.when||"", imgs: [],
+             desc: pm.descText || String(pm.attrs&&pm.attrs["Описание"]||""),
+             defect: pm.defect||"",
+             lon: pm.rep[0], lat: pm.rep[1], order: pm.order||pm.id };
+  });
+  var R = PPOKMZ.interpretPoints(points);
+  var byId = {};
+  R.poles.forEach(function(p){ byId[p.id] = p; });
+  var skipped = {};
+  R.skipped.forEach(function(sk){ skipped[sk.id] = sk; });
+  return { R:R, byId:byId, skipped:skipped, pts:pts };
+}
+/* разобранная запись для одной метки */
+function parsedFor(pm, cache){
+  var c = cache || interpretMarks();
+  return c ? c.byId["pm"+pm.id] : null;
+}
+
+function markPayload(pm, cache){
+  var q = parsedFor(pm, cache);
+  if(q){
+    return { markId:"pm"+pm.id, poleId:pm.poleId||"", line:q.line||"", pole:q.num,
+             kv:pm.kv||q.kv||"", poleType:pm.poleType||"",
+             /* марка, заданная в карточке метки, главнее разбора полевой подписи */
+             mark: pm.mark || PPOKMZ.matchMark(q.fieldMark, q.kv) || "",
+             fieldMark:q.fieldMark||"", combined:!!q.combined,
+             note:q.note||"", span:(q.span===undefined?"":q.span),
+             defect:q.defect||"", when:q.when||"",
+             name:pm.name||"", folder:pm.folder||"",
+             lat:pm.rep[1].toFixed(6), lon:pm.rep[0].toFixed(6) };
+  }
+  /* метка номера не дала — уйдёт в список меток без опоры */
+  return { markId:"pm"+pm.id, poleId:pm.poleId||"", line:pm.folder||"", pole:guessPoleNumber(pm),
+           kv:pm.kv||"", poleType:pm.poleType||"", mark:pm.mark||"", defect:pm.defect||"",
+           name:pm.name||"", folder:pm.folder||"", when:pm.when||"",
+           lat:pm.rep[1].toFixed(6), lon:pm.rep[0].toFixed(6) };
+}
+/* перенос новых фотографий метки в общее хранилище осмотра */
+function adoptPhotos(pm){
+  var fresh=(pm.photos||[]).filter(function(ph){ return ph.blob && !ph.storedId; });
+  if(!fresh.length) return Promise.resolve([]);
+  return fresh.reduce(function(ch,ph){
+    return ch.then(function(acc){
+      return PPO.photoAdopt(ph.blob, guessPoleNumber(pm), pm.folder||"").then(function(id){
+        ph.storedId=id; acc.push(id); return acc;
+      }).catch(function(){ return acc; });
+    });
+  }, Promise.resolve([]));
+}
+/* синхронизация одной метки — вызывается при сохранении в карточке */
+function syncOne(pm){
+  pullBusy = true;                     /* правка идёт из карты — обратный подхват не нужен */
+  return adoptPhotos(pm).then(function(ids){
+    var pl=markPayload(pm); pl.photoIds=ids;
+    /* Метка без распознанного номера всё равно передаётся в осмотр: ядро
+       отложит её в список «метки, не ставшие опорами» вместе со снимками.
+       Раньше здесь был ранний выход, и такая метка терялась молча — ни
+       карточки, ни строки в списке. */
+    var r=PPO.syncMarksToPoles([pl]);
+    /* Закрепляем связь «метка → опора». С этого момента переименование опоры
+       на карте или в осмотре сопоставление не рвёт: ядро ищет цель сначала
+       по идентификатору и только потом по паре «линия + номер». */
+    if(r && r.bound && r.bound[pl.markId]) pm.poleId=r.bound[pl.markId];
+    pm.dirty=false;
+    /* цепь пролётов изменилась — цвет и подпись метки могли устареть */
+    refreshGaps(); updatePmVisual(pm);
+    saveMapState();
+    updateSyncBadge();
+    pullBusy = false;
+    return r;
+  }).catch(function(e){ pullBusy = false; throw e; });
+}
+function updateSyncBadge(){
+  var el=document.getElementById("syncState"); if(!el) return;
+  var pend=placemarks.filter(function(p){ return p.type==="point"&&p.dirty; }).length;
+  var n=PPO.load().poles.length;
+  var saved = false;
+  try{ saved = !!localStorage.getItem(MAP_KEY); }catch(e){}
+  var tail = (placemarks.length ? (saved ? " · карта сохранена" : " · карта не сохранена") : "");
+  el.textContent = (autoSync
+    ? ("синхронизация включена · опор в осмотре: "+n+(pend?" · не перенесено: "+pend:""))
+    : ("синхронизация вручную · опор в осмотре: "+n+(pend?" · изменено меток: "+pend:""))) + tail;
+  el.className = pend ? "sync-state warn" : "sync-state";
+}
+function toggleAutoSync(){
+  autoSync=!autoSync;
+  localStorage.setItem("ppo_map_autosync", autoSync?"1":"0");
+  var b=document.getElementById("autoSyncBtn");
+  if(b){ b.classList.toggle("on",autoSync); b.textContent=autoSync?"⇄ Синхронизация: авто":"⇄ Синхронизация: вручную"; }
+  updateSyncBadge();
+  toast(autoSync?"Правки меток сразу уходят в осмотр":"Правки нужно переносить кнопкой «→ В осмотр»");
+}
+
+function sendToOsmotr(){
+  var pts = placemarks.filter(function(pm){ return pm.type==="point"; });
+  if(!pts.length){ toast("Точечных меток нет — переносить нечего.",true); return; }
+  var noNum = pts.filter(function(pm){ return !guessPoleNumber(pm); }).length;
+  if(noNum===pts.length){
+    toast("Ни у одной метки нет номера опоры — сопоставлять не с чем. Откройте метку и заполните «Номер опоры».",true);
+    return;
+  }
+  var n0 = PPO.load().poles.length;
+  if(n0 && !confirm("В осмотре уже есть опоры: "+n0+".\n\nСовпадающие по линии и номеру будут обновлены (координаты, дефект), новые — добавлены.\nМарка, класс, пролёт и прочие поля, заполненные в осмотре вручную, сохранятся.\n\nПродолжить?")) return;
+
+  toast("Переношу метки и фотографии…");
+  var cache = interpretMarks();     /* разбор обхода целиком — линии наследуются */
+  pts.reduce(function(ch,pm){
+    return ch.then(function(acc){
+      return adoptPhotos(pm).then(function(ids){
+        var pl=markPayload(pm,cache); pl.photoIds=ids;
+        acc.push(pl); return acc;
+      });
+    });
+  }, Promise.resolve([])).then(function(payload){
+    var r = PPO.syncMarksToPoles(payload);
+    pts.forEach(function(pm){
+      pm.dirty=false;
+      if(r && r.bound && r.bound["pm"+pm.id]) pm.poleId=r.bound["pm"+pm.id];
+    });
+    refreshGaps();
+    pts.forEach(updatePmVisual);
+    saveMapState();
+    updateSyncBadge();
+    var msg = "В осмотр перенесено: добавлено "+r.added+", обновлено "+r.updated;
+    if(r.matched) msg += ", без изменений "+r.matched;
+    if(r.noNum)   msg += ". Без номера опоры: "+r.noNum+" — в разделе «Опоры» списком «метки без опоры»";
+    /* точки, претендующие на уже занятый номер, больше не сливаются в одну
+       карточку: они отложены и ждут решения человека */
+    if(r.conflicts) msg += ". Номер занят другой точкой: "+r.conflicts+
+      " — отложены, разберите в «Осмотр» → «Опоры»";
+    /* координаты изменились — пролёты, посчитанные по ним, пересчитаны ядром */
+    if(r.spans && r.spans.changed) msg += ". Пересчитано пролётов: "+r.spans.changed;
+    if(r.spans && r.spans.skippedManual) msg += ", не тронуто введённых вручную: "+r.spans.skippedManual;
+    toast(msg);
+    setTimeout(function(){ if(confirm(msg+".\n\nОткрыть осмотр?")) location.href="osmotr.html#poles"; }, 500);
+  });
+}
+
+/* Подтягивает изменения из осмотра в уже загруженные метки: координаты,
+   дефект, марка. Метки, которых на карте нет, добавляются. Ничего не дублирует. */
+var pullBusy = false;
+function pullFromOsmotr(silent){
+  if(pullBusy) return { updated:0, added:0 };
+  pullBusy = true;
+  try { return pullFromOsmotrInner(silent); }
+  finally { pullBusy = false; }
+}
+function pullFromOsmotrInner(silent){
+  var D = PPO.load(), upd = 0, add = [];
+  var byId = {}, byKey = {};
+  placemarks.forEach(function(pm){
+    if(pm.type!=="point") return;
+    if(pm.poleId) byId[pm.poleId] = pm;
+    var num = guessPoleNumber(pm);
+    if(num) byKey[(pm.folder||"")+"|"+num] = pm;
+  });
+  D.poles.forEach(function(p){
+    if(!p.lat || !p.lon) return;
+    var pm = byId[p.id] || byKey[(p.line||"")+"|"+String(p.num)];
+    if(!pm){ add.push(p); return; }
+    var lat = +String(p.lat).replace(",","."), lon = +String(p.lon).replace(",",".");
+    var ch = false;
+    if(Math.abs(pm.rep[1]-lat) > 1e-7 || Math.abs(pm.rep[0]-lon) > 1e-7){
+      var ok = coordKey(pm.rep);
+      pm.rep = [lon,lat]; pm.coords[0] = [lon,lat,(pm.coords[0]||[])[2]||0];
+      if(pointIndex[ok]===pm) delete pointIndex[ok];
+      pointIndex[coordKey(pm.rep)] = pm;
+      ch = true;
+    }
+    var dfc = (p.defect==="—" ? "" : PPO.normCat(p.defect));
+    if((pm.defect||"") !== dfc){ pm.defect = dfc; ch = true; }
+    if(!pm.poleId){ pm.poleId = p.id; ch = true; }
+    /* Обратное направление того же исправления: опору переименовали в осмотре —
+       метка должна принять новый номер, а не остаться со старым. Название
+       правим только там, где оно было производным от номера, чтобы не затирать
+       полевую подпись с маркой и замечанием. */
+    var pnum = String(p.num||"");
+    if(pnum && String(pm.pole||"") !== pnum){
+      var wasDerived = (String(pm.name||"") === "Опора № "+String(pm.pole||"")) ||
+                       (String(pm.name||"").trim() === String(pm.pole||"").trim());
+      pm.pole = pnum;
+      if(wasDerived) pm.name = "Опора № " + pnum;
+      ch = true;
+    }
+    if(p.line && (pm.folder||"") !== p.line){ pm.folder = p.line; ch = true; }
+    if(p.mark) pm.attrs["Марка опоры"] = p.mark;
+    if(ch) upd++;
+  });
+  if(add.length){
+    add.forEach(function(p){
+      var d = PPO.poleDerived(p);
+      addPlacemark({ name:"Опора № "+p.num, folder:p.line||"Осмотр", type:"point",
+        coords:[[+String(p.lon).replace(",","."), +String(p.lat).replace(",","."), 0]],
+        attrs:{ "Марка опоры":p.mark||"", "Состояние":d.state, "Технологическая возможность":d.tv },
+        photos:[], pole:String(p.num), poleType:d.ptype||"", poleId:p.id, kv:p.kv||"",
+        defect:(p.defect==="—"?"":PPO.normCat(p.defect)) }, false);
+    });
+  }
+  if(upd || add.length){ redraw(); saveMapState(); }
+  else refreshAllVisual();   /* цепь могла измениться в «Осмотре» без правки меток */
+  if(!silent){
+    if(upd || add.length) toast("Из осмотра подтянуто: обновлено "+upd+", добавлено "+add.length);
+    else toast("Расхождений с осмотром нет");
+  }
+  return { updated:upd, added:add.length };
+}
+
+function loadFromOsmotr(){
+  var D = PPO.load();
+  var withGeo = D.poles.filter(function(p){ return p.lat && p.lon; });
+  if(!withGeo.length){ toast("В осмотре нет опор с координатами.",true); return; }
+  /* если метки уже есть — не дублируем, а обновляем */
+  if(placemarks.some(function(pm){ return pm.type==="point"; })){
+    var r = pullFromOsmotr(true);
+    toast("Обновлено меток: "+r.updated+", добавлено: "+r.added+". Дубли не создавались.");
+    fitAll(); return;
+  }
+  toast("Загружаю опоры и фотографии…");
+  /* фотографии лежат в локальной базе осмотра — подтягиваем их к меткам */
+  var chain = Promise.resolve(), shots = 0;
+  withGeo.forEach(function(p){
+    chain = chain.then(function(){
+      var ids = p.photos || [];
+      return ids.reduce(function(c, id){
+        return c.then(function(acc){
+          return PPO.photoGet(id).then(function(rec){
+            if (rec && rec.blob)
+              acc.push({ url:URL.createObjectURL(rec.blob), blob:rec.blob, ext:"jpg",
+                         storedId:id,
+                         name:"опора_"+p.num+"_"+acc.length+".jpg" });
+            return acc;
+          }).catch(function(){ return acc; });
+        });
+      }, Promise.resolve([])).then(function(photos){
+        shots += photos.length;
+        var d = PPO.poleDerived(p);
+        addPlacemark({ name:"Опора № "+p.num, folder:p.line||"Осмотр", type:"point",
+          coords:[[+String(p.lon).replace(",","."), +String(p.lat).replace(",","."), 0]],
+          attrs:{ "Марка опоры":p.mark||"", "Состояние":d.state, "Технологическая возможность":d.tv,
+                  "Пролёт, м":p.span||"", "Подвесов связи":p.hangs||0,
+                  "Примечание":p.note||"" },
+          photos:photos, pole:String(p.num), poleType:d.ptype||"",
+          poleId:p.id, kv:p.kv||"",
+          defect:(p.defect==="—"?"":p.defect) }, false);
+      });
+    });
+  });
+  chain.then(function(){
+    redraw(); fitAll(); updateSyncBadge(); saveMapState();
+    toast("Из осмотра загружено опор: "+withGeo.length+(shots?", фотографий: "+shots:"") +
+          ". Правки меток вернутся в осмотр" + (autoSync?" автоматически.":" по кнопке «→ В осмотр»."));
+  });
+}
+</script>
+</body>
+</html>

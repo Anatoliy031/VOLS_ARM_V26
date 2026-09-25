@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Планирование выездов на обследование · ППО ВОЛС</title>
+<style>
+  :root{
+    --rs:#005B9C;--rs-d:#003E6B;--rs-l:#E7F0F8;
+    --ink:#182633;--muted:#61758a;--line:#d8e1ea;--bg:#f3f6fa;--card:#fff;
+    --ok:#2b7a4b;--ok-bg:#e5f3ea;--warn:#b8362a;--warn-bg:#fbe5e2;
+    --amber:#b8780b;--amber-bg:#fdf2da;--far:#6b46c1;--far-bg:#efe9fb;
+    --sh:0 1px 2px rgba(16,42,67,.06),0 6px 20px rgba(16,42,67,.07);--r:14px;
+  }
+  *{box-sizing:border-box}html,body{margin:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.45;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1400px;margin:0 auto;padding:0 16px 60px}
+  header.top{background:linear-gradient(135deg,var(--rs),var(--rs-d));color:#fff}
+  .top-in{max-width:1400px;margin:0 auto;padding:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .mark{width:42px;height:42px;border-radius:11px;background:#fff;color:var(--rs);display:grid;place-items:center;font-weight:800;font-size:16px;flex:0 0 auto}
+  .brand h1{margin:0;font-size:18px;font-weight:700}.brand p{margin:2px 0 0;font-size:12px;opacity:.85}
+  .top-meta{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:12.5px;flex-wrap:wrap}
+  .live{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.15);padding:7px 12px;border-radius:999px}
+  .dot{width:8px;height:8px;border-radius:50%;background:#82f39d}.dot.bad{background:#ff9c8f}
+  a.back{color:#fff;text-decoration:none;font-size:12.5px;background:rgba(255,255,255,.15);padding:7px 12px;border-radius:999px}
+  .ppoNav{display:flex;gap:4px;flex-wrap:wrap}
+  .ppoNav a{color:#fff;text-decoration:none;font-size:12.5px;font-weight:600;padding:6px 12px;
+    border-radius:999px;background:rgba(255,255,255,.14);white-space:nowrap}
+  .ppoNav a.on{background:#fff;color:var(--rs-d)}
+  .btn{border:0;cursor:pointer;font:inherit;font-size:12.5px;font-weight:600;background:#fff;color:var(--rs-d);padding:8px 14px;border-radius:999px}
+
+  .note{border-radius:12px;padding:13px 15px;margin:16px 0;font-size:13px;background:#fff;border:1px solid var(--line);border-left:4px solid var(--amber);box-shadow:var(--sh)}
+  .note b{display:block;margin-bottom:3px}
+  h2.sec{font-size:13px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin:24px 2px 12px;font-weight:700}
+
+  .params{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px 22px}
+  .prm{display:flex;flex-direction:column;gap:5px}
+  .prm label{font-size:12px;color:var(--muted);font-weight:600;display:flex;justify-content:space-between}
+  .prm label b{color:var(--rs-d);font-variant-numeric:tabular-nums}
+  .prm input[type=range]{width:100%;accent-color:var(--rs)}
+  .prm-row{display:flex;gap:8px;align-items:center}
+  .prm select,.prm .chk{font:inherit;font-size:13px}
+  .chk{display:flex;align-items:center;gap:7px;cursor:pointer;color:var(--ink)}
+
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:11px;margin-top:12px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:13px 15px;box-shadow:var(--sh);position:relative;overflow:hidden}
+  .kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--rs)}
+  .kpi .n{font-size:25px;font-weight:800;line-height:1}.kpi .l{font-size:11.5px;color:var(--muted);font-weight:600;margin-top:5px}
+  .kpi.warn::before{background:var(--warn)}.kpi.warn .n{color:var(--warn)}
+  .kpi.far::before{background:var(--far)}.kpi.far .n{color:var(--far)}
+
+  #map{border-radius:var(--r);border:1px solid var(--line);box-shadow:var(--sh);overflow:hidden;background:#f7fafc}
+  #map svg{display:block;width:100%;height:auto}
+  #map .mlabel{font:600 11px -apple-system,Arial,sans-serif;fill:#3a4a5a;pointer-events:none}
+  #map .mlabel.depot{fill:#b8362a;font-weight:700}
+  #map .mdot{cursor:pointer}
+  #map .mdot:hover{stroke:#182633;stroke-width:2}
+  .map-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:8px 2px 0}
+  .map-legend span{display:flex;align-items:center;gap:6px}
+  .map-legend i{width:11px;height:11px;border-radius:50%;display:inline-block}
+
+  .trips{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
+  .trip{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);overflow:hidden;border-top:4px solid var(--rs)}
+  .trip.warn{border-top-color:var(--warn)}.trip.far{border-top-color:var(--far)}
+  .trip .th{padding:12px 14px 10px;border-bottom:1px solid var(--line)}
+  .trip .th .rn{font-weight:700;font-size:15px}
+  .trip .th .rn .approx{font-size:11px;color:var(--muted);font-weight:400}
+  .trip .badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+  .b{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}
+  .b.km{background:var(--rs-l);color:var(--rs-d)}.b.h{background:var(--ok-bg);color:var(--ok)}
+  .b.warn{background:var(--warn-bg);color:var(--warn)}.b.far{background:var(--far-bg);color:var(--far)}
+  .trip .time{padding:9px 14px;background:var(--bg);font-size:11.5px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap}
+  .trip .time b{color:var(--ink);font-variant-numeric:tabular-nums}
+  .trip ul{margin:0;padding:8px 14px 12px;list-style:none}
+  .trip li{font-size:12.5px;padding:5px 0;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:baseline}
+  .trip li:last-child{border:0}
+  .trip li .k{margin-left:auto;font-weight:700;color:var(--rs-d);font-variant-numeric:tabular-nums;flex:0 0 auto}
+  .trip li .oc{color:var(--muted);font-size:11px}
+  .trip li .pay{font-size:10px;font-weight:700;padding:0 6px;border-radius:999px;flex:0 0 auto}
+  .pay.paid{background:var(--ok-bg);color:var(--ok)}.pay.partial{background:var(--amber-bg);color:var(--amber)}.pay.unpaid{background:#ececec;color:#888}
+
+  .far-block,.noloc.done{border-left-color:#2B7A4B;background:#F1F8F3}
+.noloc.done h4{color:#1F5C38}
+.noloc .sub{margin:2px 0 6px;font-size:12px;color:#61758a}
+.noloc{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:14px 16px;margin-top:12px}
+  .far-block h4{margin:0 0 8px;font-size:13px;color:var(--far)}
+  .far-block ul,.noloc ul{margin:6px 0 0;padding-left:18px;font-size:12.5px}
+  .noloc h4{margin:0 0 8px;font-size:13px;color:var(--muted)}
+  footer{margin-top:22px;font-size:12px;color:var(--muted);text-align:center;line-height:1.6}
+
+  @media(max-width:720px){
+    .wrap{padding:0 12px 48px}.kpis{grid-template-columns:repeat(2,1fr)}
+    #map{height:340px}.trips{grid-template-columns:1fr}
+    .top-meta{width:100%;justify-content:space-between;margin-left:0}
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="top-in">
+    <div class="mark">ВЛ</div>
+    <div class="brand"><h1>Планирование выездов на обследование</h1>
+      <p>Маршруты из Краснодара · лимиты: ≤ 30 км опор и ≤ 10 ч на выезд</p></div>
+    <div class="top-meta">
+      <nav id="ppoNav" class="ppoNav"></nav>
+      <span class="live"><span class="dot" id="dot"></span><span id="upd">загрузка…</span></span>
+      <button class="btn" id="refresh">Обновить</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div id="msg"></div>
+
+  <h2 class="sec">Параметры планирования</h2>
+  <div class="params">
+    <div class="prm"><label>Макс. км опор за выезд <b id="vKm">30</b></label>
+      <input type="range" id="pKm" min="10" max="60" step="5" value="30"></div>
+    <div class="prm"><label>Макс. длительность выезда, ч <b id="vH">10</b></label>
+      <input type="range" id="pH" min="6" max="14" step="1" value="10"></div>
+    <div class="prm"><label>Скорость в пути, км/ч <b id="vDrive">70</b></label>
+      <input type="range" id="pDrive" min="40" max="90" step="5" value="70"></div>
+    <div class="prm"><label>Темп обследования, км/ч <b id="vInsp">5</b></label>
+      <input type="range" id="pInsp" min="2" max="12" step="1" value="5"></div>
+    <div class="prm"><label>Коэф. извилистости дорог <b id="vRoad">1.35</b></label>
+      <input type="range" id="pRoad" min="1.1" max="1.7" step="0.05" value="1.35"></div>
+    <div class="prm">
+      <label>Отбор объектов</label>
+      <div class="prm-row"><select id="fPes"><option value="">Все ПЭС</option></select></div>
+      <label class="chk" style="margin-top:6px"><input type="checkbox" id="onlyPaid" checked> только оплаченные</label>
+    </div>
+  </div>
+
+  <section class="kpis" id="kpis"></section>
+
+  <h2 class="sec">Схематичная карта выездов · маркеры — центры районов, не точные адреса</h2>
+  <div id="map"></div>
+  <div class="map-legend">
+    <span><i style="background:#b8362a"></i> Краснодар — база</span>
+    <span><i style="background:#005B9C"></i> район в графике</span>
+    <span><i style="background:#6b46c1"></i> дальний / с ночёвкой</span>
+    <span>размер маркера — число объектов</span>
+  </div>
+
+  <h2 class="sec">Поездки <span id="tripCount" style="color:var(--muted);text-transform:none;letter-spacing:0;font-weight:400"></span></h2>
+  <div class="trips" id="trips"></div>
+  <div id="far"></div>
+  <div id="noloc"></div>
+<div id="done"></div>
+
+  <footer id="foot"></footer>
+</div>
+
+<script>
+/* ═══════════ ИСТОЧНИК ═══════════ */
+const PUB="https://docs.google.com/spreadsheets/d/e/2PACX-1vRhbMRx34WsWor15YtcCDHfpfJ3C3AC28vvFcTSglP3hBvZQBEgPvtnUSekcX_mnYJgMw4ZW-IHIT4k";
+const GID="958994541";
+const SOURCES=[`${PUB}/pub?gid=${GID}&single=true&output=csv`,`${PUB}/pub?output=csv`];
+const REFRESH_MS=60000;
+
+/* ═══════════ ГЕОГРАФИЯ ═══════════ */
+const KRD=[45.0355,38.9753];
+const PLACES=[
+ ["сочи",43.60,39.73,"Сочи"],["туапс",44.10,39.08,"Туапсинский р-н"],["шепси",44.03,39.15,"Туапсинский р-н"],
+ ["белореченск",44.766,39.874,"Белореченский р-н"],["ханск",44.63,40.03,"Майкоп (Ханская)"],
+ ["даховск",44.22,40.21,"Майкопский р-н"],["блечепсин",44.90,40.60,"Кошехабльский р-н"],
+ ["гиагинск",44.86,40.34,"Гиагинский р-н"],["красногвардейск",45.17,39.68,"Красногвардейский р-н"],
+ ["веселый",44.90,40.19,"Шовгеновский р-н"],["шовгенов",44.90,40.19,"Шовгеновский р-н"],
+ ["яблоновск",45.00,38.98,"Тахтамукайский р-н"],["тахтамукай",45.00,38.98,"Тахтамукайский р-н"],
+ ["афипск",44.90,38.84,"Северский р-н"],["новодмитриевск",44.78,38.72,"Северский р-н"],["северск",44.85,38.68,"Северский р-н"],
+ ["каневск",46.08,38.97,"Каневской р-н"],["стародеревянковск",46.05,38.98,"Каневской р-н"],["челбас",46.0,39.06,"Каневской р-н"],
+ ["приморско-ахтарск",46.05,38.17,"Приморско-Ахтарский р-н"],["ахтарск",46.05,38.17,"Приморско-Ахтарский р-н"],["бриньковск",46.05,38.40,"Приморско-Ахтарский р-н"],
+ ["брюховецк",45.80,38.67,"Брюховецкий р-н"],["новоджерелиевск",45.80,38.90,"Брюховецкий р-н"],["гарбузов",45.85,38.82,"Брюховецкий р-н"],
+ ["щербиновск",46.63,38.68,"Щербиновский р-н"],["кухаривк",46.55,38.30,"Ейский р-н"],
+ ["ейск",46.71,38.27,"Ейский р-н"],["должанск",46.63,37.80,"Ейский р-н"],
+ ["успенск",44.83,41.32,"Успенский р-н"],["вольное",44.83,41.28,"Успенский р-н"],
+ ["новокубанск",45.10,41.02,"Новокубанский р-н"],["советск",45.10,41.10,"Новокубанский р-н"],["радищев",45.05,41.05,"Новокубанский р-н"],["федоровск",45.10,40.95,"Новокубанский р-н"],["глубок",45.08,41.00,"Новокубанский р-н"],
+ ["отрадн",44.39,41.52,"Отрадненский р-н"],["урупск",44.30,41.50,"Отрадненский р-н"],["тенгинск",44.42,41.48,"Отрадненский р-н"],
+ ["гулькевич",45.36,40.69,"Гулькевичский р-н"],["машевск",45.40,40.75,"Гулькевичский р-н"],["духовск",45.30,40.70,"Гулькевичский р-н"],["чаплыгин",45.35,40.72,"Гулькевичский р-н"],["самойлов",45.33,40.68,"Гулькевичский р-н"],
+ ["кавказск",45.43,40.57,"Кавказский р-н"],["десятихатк",45.50,40.60,"Кавказский р-н"],["кропоткин",45.43,40.57,"Кавказский р-н"],
+ ["тбилисск",45.36,40.19,"Тбилисский р-н"],["ванновск",45.28,40.05,"Тбилисский р-н"],
+ ["курганинск",44.88,40.60,"Курганинский р-н"],["лабинск",44.63,40.73,"Лабинский р-н"],["владимирск",44.60,40.80,"Лабинский р-н"],["упорн",44.55,40.90,"Лабинский р-н"],
+ ["мостовск",44.42,40.79,"Мостовской р-н"],["унароков",44.55,40.70,"Мостовской р-н"],
+ ["тимашевск",45.61,38.94,"Тимашевский р-н"],["стринск",45.65,38.90,"Тимашевский р-н"],["выселк",45.58,39.66,"Выселковский р-н"],
+ ["кущевск",46.56,39.64,"Кущёвский р-н"],["первомайск",46.50,39.60,"Кущёвский р-н"],
+ ["ленинградск",46.32,39.39,"Ленинградский р-н"],["коржи",46.04,39.26,"Ленинградский р-н"],
+ ["новороссийск",44.72,37.77,"Новороссийск"],["шесхарис",44.71,37.82,"Новороссийск"],
+ ["геленджик",44.56,38.08,"Геленджик"],["архипо-осиповк",44.36,38.53,"Геленджик"],["прасковеевк",44.44,38.36,"Геленджик"],["бетта",44.42,38.42,"Геленджик"],["береговое",44.50,38.20,"Геленджик"],
+ ["анапск",44.89,37.32,"Анапский р-н"],["анапа",44.89,37.32,"Анапский р-н"],["гостагаевск",45.02,37.50,"Анапский р-н"],["витязево",44.98,37.31,"Анапский р-н"],["раевск",44.85,37.63,"Анапский р-н"],["варениковск",45.12,37.64,"Анапский р-н"],
+ ["крымск",44.90,37.99,"Крымский р-н"],["холмск",44.84,38.38,"Абинский р-н"],["абинск",44.87,38.16,"Абинский р-н"],
+ ["темрюк",45.28,37.38,"Темрюкский р-н"],["голубицк",45.32,37.28,"Темрюкский р-н"],["тамань",45.21,36.71,"Темрюкский р-н"],["курчанск",45.22,37.50,"Темрюкский р-н"],
+ ["славянск",45.26,38.13,"Славянский р-н"],["анастасиевск",45.32,37.98,"Славянский р-н"],
+ ["усть-лабинск",45.22,39.68,"Усть-Лабинский р-н"],["воронежск",45.30,39.58,"Усть-Лабинский р-н"],["кирпильск",45.36,39.65,"Усть-Лабинский р-н"],
+ ["кореновск",45.47,39.45,"Кореновский р-н"],["пролетарск",45.50,39.40,"Кореновский р-н"],
+ ["новопокровск",45.95,40.70,"Новопокровский р-н"],["калниболотск",46.03,40.80,"Новопокровский р-н"],
+ ["павловск",46.13,39.79,"Павловский р-н"],
+];
+const PES_CENTER={"СЭС":[43.60,39.73,"Сочинские ЭС (зона)"],"АрЭС":[45.00,41.12,"Армавирские ЭС (зона)"],
+ "АрмЭС":[45.00,41.12,"Армавирские ЭС (зона)"],"ЛбЭС":[44.63,40.73,"Лабинские ЭС (зона)"],
+ "КЭС":[45.04,38.98,"Краснодарские ЭС (зона)"],"АдЭС":[44.61,40.10,"Адыгейские ЭС (зона)"],
+ "ТхЭС":[45.86,40.13,"Тихорецкие ЭС (зона)"],"УЛЭС":[45.22,39.68,"Усть-Лабинские ЭС (зона)"],
+ "ЛнЭС":[46.32,39.39,"Ленинградские ЭС (зона)"],"ЮЗЭС":[44.90,37.99,"Юго-Западные ЭС (зона)"],
+ "ЮзЭС":[44.90,37.99,"Юго-Западные ЭС (зона)"],"СлЭС":[45.26,38.13,"Славянские ЭС (зона)"],
+ "ТмЭС":[45.61,38.94,"Тимашевские ЭС (зона)"]};
+function haversine(a,b){const R=6371,dl=(b[0]-a[0])*Math.PI/180,dg=(b[1]-a[1])*Math.PI/180;
+ const s=Math.sin(dl/2)**2+Math.cos(a[0]*Math.PI/180)*Math.cos(b[0]*Math.PI/180)*Math.sin(dg/2)**2;
+ return 2*R*Math.asin(Math.sqrt(s));}
+function resolvePlace(text){const t=(text||"").toLowerCase();
+ for(const p of PLACES)if(t.includes(p[0]))return{lat:p[1],lon:p[2],name:p[3]};return null;}
+function resolveByPes(pes){const p=PES_CENTER[(pes||"").trim()];return p?{lat:p[0],lon:p[1],name:p[2],byPes:true}:null;}
+
+/* ═══════════ УПАКОВКА В ПОЕЗДКИ ═══════════ */
+function planTrips(objs,P){
+ const {maxKm,maxH,driveSpeed,inspectSpeed,roadFactor}=P;
+ const groups={};
+ for(const o of objs){const k=o.place?o.place.name:"__none";
+  (groups[k]=groups[k]||{place:o.place,items:[]}).items.push(o);}
+ const trips=[],unreachable=[],unassigned=[];
+ for(const k in groups){const g=groups[k];
+  if(!g.place){unassigned.push(...g.items);continue;}
+  const dist=haversine(KRD,[g.place.lat,g.place.lon])*roadFactor,driveH=dist/driveSpeed,roundH=2*driveH;
+  const items=g.items.slice().sort((a,b)=>(b.km||0)-(a.km||0));
+  if(roundH>=maxH){unreachable.push({place:g.place,dist,roundH,items,km:items.reduce((s,x)=>s+(x.km||0),0)});continue;}
+  const cap=Math.min(maxKm,(maxH-roundH)*inspectSpeed);
+  let bins=[];
+  for(const it of items){const w=it.km||0;let placed=false;
+   for(const bin of bins){if(bin.km+w<=cap+1e-6){bin.km+=w;bin.items.push(it);placed=true;break;}}
+   if(!placed)bins.push({km:w,items:[it]});}
+  for(const bin of bins){const inspectH=bin.km/inspectSpeed;
+   trips.push({place:g.place,dist,driveH,roundH,inspectH,totalH:roundH+inspectH,km:bin.km,items:bin.items,
+    overCap:bin.km>maxKm+1e-6,overTime:(roundH+bin.km/inspectSpeed)>maxH+1e-6});}
+ }
+ trips.sort((a,b)=>a.dist-b.dist);
+ return {trips,unreachable,unassigned};
+}
+
+/* ═══════════ CSV ═══════════ */
+function parseCSV(t){const rows=[];let row=[],f="",q=false;
+ for(let i=0;i<t.length;i++){const c=t[i];
+  if(q){if(c=='"'){if(t[i+1]=='"'){f+='"';i++;}else q=false;}else f+=c;}
+  else{if(c=='"')q=true;else if(c==','){row.push(f);f="";}
+   else if(c=='\n'){row.push(f);rows.push(row);row=[];f="";}else if(c!='\r')f+=c;}}
+ if(f.length||row.length){row.push(f);rows.push(row);}return rows;}
+const nm=s=>(s||"").toString().trim().toLowerCase().replace(/ё/g,"е");
+function mapHeaders(head){const H={};head.forEach((h,i)=>{const t=nm(h);if(!t)return;
+ if(t.includes("пэс"))H.pes??=i;
+ else if(t.includes("контрагент"))H.cust??=i;
+ else if(t.includes("объект"))H.obj??=i;
+ else if(t.includes("предмет"))H.pred??=i;
+ else if(t.includes("протяж"))H.km??=i;
+ else if(t.includes("дата")&&t.includes("оплат"))H.pay??=i;
+ else if(t.includes("исключен"))H.excl??=i;
+ else if(t.startsWith("э3")&&t.includes("факт"))H.e3??=i;
+ /* «Статус» — по точному названию графы: в реестре есть и другие графы со
+    словом «статус» в заголовке (например, статус оплаты), и перепутать их
+    нельзя. */
+ else if(t==="статус")H.status??=i;});
+ /* Графу ищем по заголовку, а не по букве: столбцы в реестре переставляют.
+    Если заголовка «Статус» нет, берём столбец AA — там он стоит в реестре. */
+ if(H.status==null&&head.length>STATUS_COL)H.status=STATUS_COL;
+ return H;}
+/* ── Исключение по статусу договора ──
+   Объекты со статусом «Завершен», «Расторжение» или «Согласование» в выезды не
+   планируются: выезд на них уже выполнен. Сверка по началу слова, без учёта
+   регистра и буквы «ё» — «Завершён», «завершено», «Расторжение договора»,
+   «На согласовании» тоже попадают. Отрицание («Не согласовано») сюда не
+   относится: оно начинается с «не» и под правило не подпадает.            */
+const STATUS_COL=26;   // столбец AA (A = 0)
+const STATUS_DONE=[/^заверш/,/^расторж/,/^согласов/,/^на согласов/];
+function statusDone(s){const t=nm(s);return !!t&&STATUS_DONE.some(re=>re.test(t));}
+function num(s){if(s==null)return null;let t=String(s).replace(/[\s\u00a0]/g,"").replace(",",".").replace(/[^\d.]/g,"");
+ if(!t)return null;const v=parseFloat(t);return isNaN(v)?null:v;}
+function payState(s){const t=(s||"").toLowerCase().trim();
+ if(!t||t.includes("нет оплат")||t.includes("на подписи")||t.includes("момента оплаты")||(t.includes("течени")&&t.includes("оплат")))return"unpaid";
+ if(t.includes("50%")||(t.includes("аванс")&&!t.includes("100%")))return"partial";return"paid";}
+
+/* ═══════════ СОСТОЯНИЕ / РЕНДЕР ═══════════ */
+let RAW=[],map,layer;
+const $=id=>document.getElementById(id);
+function params(){return{maxKm:+$("pKm").value,maxH:+$("pH").value,driveSpeed:+$("pDrive").value,
+ inspectSpeed:+$("pInsp").value,roadFactor:+$("pRoad").value};}
+const esc=s=>(s==null?"":String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const h1=n=>n.toFixed(1).replace(".",",");
+
+function candidates(){
+ const pes=$("fPes").value, onlyPaid=$("onlyPaid").checked;
+ return RAW.filter(o=>{
+  if(o.excl)return false;
+  if(o.statusDone)return false;         // выезд выполнен: завершён, расторжение, согласование
+  if(o.e3done)return false;             // фотофиксация уже сделана
+  if(o.km==null||o.km<=0)return false;
+  if(pes&&o.pes!==pes)return false;
+  if(onlyPaid&&o.payState==="unpaid")return false;
+  return true;
+ });
+}
+
+function render(){
+ const P=params();
+ $("vKm").textContent=P.maxKm;$("vH").textContent=P.maxH;$("vDrive").textContent=P.driveSpeed;
+ $("vInsp").textContent=P.inspectSpeed;$("vRoad").textContent=P.roadFactor.toFixed(2);
+ const objs=candidates();
+ const {trips,unreachable,unassigned}=planTrips(objs,P);
+
+ const totalKm=objs.reduce((s,o)=>s+(o.km||0),0);
+ const okTrips=trips.filter(t=>!t.overCap&&!t.overTime).length;
+ const problem=trips.filter(t=>t.overCap||t.overTime).length+unreachable.length;
+ $("kpis").innerHTML=[
+  ["",objs.length,"Объектов к обследованию",""],
+  ["",h1(totalKm)+" км","Суммарно опор",""],
+  ["",trips.length,"Поездок в графике",""],
+  ["far",unreachable.length,"Дальних (ночёвка)","far"],
+  ["warn",problem,"Требуют разбивки","warn"],
+ ].map(([_,n,l,cls])=>`<div class="kpi ${cls}"><div class="n">${n}</div><div class="l">${l}</div></div>`).join("");
+
+ $("tripCount").textContent=trips.length?`· ${trips.length} шт., отсортированы по удалённости`:"";
+
+ // карта
+ drawMap(trips,unreachable);
+
+ // карточки поездок
+ $("trips").innerHTML=trips.map(t=>{
+  const cls=(t.overCap||t.overTime)?"warn":"";
+  const badges=[`<span class="b km">${h1(t.km)} км</span>`,
+   `<span class="b ${(t.overTime)?"warn":"h"}">${h1(t.totalH)} ч</span>`,
+   t.overCap?`<span class="b warn">&gt; ${P.maxKm} км — разбить</span>`:"",
+   (t.overTime&&!t.overCap)?`<span class="b warn">&gt; ${P.maxH} ч</span>`:""].join("");
+  return `<div class="trip ${cls}">
+   <div class="th"><div class="rn">${esc(t.place.name)} ${t.place.byPes?'<span class="approx">≈ по зоне ПЭС</span>':""}</div>
+    <div class="badges">${badges}</div></div>
+   <div class="time">📍 ${Math.round(t.dist)} км от Краснодара · дорога <b>${h1(t.roundH)} ч</b> · обследование <b>${h1(t.inspectH)} ч</b></div>
+   <ul>${t.items.map(o=>`<li>
+     <span>${esc(o.cust||"—")}<div class="oc">${esc((o.obj||"").slice(0,60))}</div></span>
+     <span class="pay ${o.payState}">${o.payState==="paid"?"опл":o.payState==="partial"?"50%":"нет"}</span>
+     <span class="k">${o.km!=null?h1(o.km):"—"}</span></li>`).join("")}</ul>
+  </div>`;
+ }).join("")||`<div class="noloc">Нет объектов к обследованию по текущему отбору.</div>`;
+
+ // дальние
+ $("far").innerHTML=unreachable.length?`<div class="far-block"><h4>Дальние районы — одним днём не успеть (плечо ≥ ${P.maxH} ч), нужен выезд с ночёвкой</h4>
+   <ul>${unreachable.map(u=>`<li>${esc(u.place.name)} — ${Math.round(u.dist)} км, ${h1(u.roundH)} ч только дорога, ${u.items.length} об., ${h1(u.km)} км опор</li>`).join("")}</ul></div>`:"";
+
+ // без км
+ const noKm=RAW.filter(o=>!o.excl&&!o.statusDone&&!o.e3done&&(o.km==null||o.km<=0)&&(!$("onlyPaid").checked||o.payState!=="unpaid")&&(!$("fPes").value||o.pes===$("fPes").value));
+ $("noloc").innerHTML=noKm.length?`<div class="noloc"><h4>Без протяжённости — не попали в планирование (${noKm.length})</h4>
+   <ul>${noKm.slice(0,12).map(o=>`<li>${esc(o.pes)} · ${esc(o.cust||o.obj||"—")}</li>`).join("")}</ul></div>`:"";
+
+ /* Исключённые по статусу. Показываем явно: после обновления реестра число
+    объектов к обследованию заметно меньше, и видно должно быть, почему. */
+ const pesF=$("fPes").value;
+ const byStatus=RAW.filter(o=>o.statusDone&&!o.excl&&(!pesF||o.pes===pesF));
+ const groups={};byStatus.forEach(o=>{const k=o.status||"—";groups[k]=(groups[k]||0)+1;});
+ $("done").innerHTML=byStatus.length?`<div class="noloc done"><h4>Исключены из выездов — выезд уже выполнен (${byStatus.length})</h4>
+   <p class="sub">Статус в реестре «Завершен», «Расторжение» или «Согласование».</p>
+   <ul>${Object.keys(groups).sort((a,b)=>groups[b]-groups[a]).map(k=>`<li>${esc(k)} — ${groups[k]}</li>`).join("")}</ul></div>`:"";
+}
+
+function drawMap(trips,unreachable){
+ // агрегируем по точке (район)
+ const byName={};
+ [...trips.map(t=>({t,far:false})),...unreachable.map(t=>({t,far:true}))].forEach(({t,far})=>{
+  const key=t.place.name;(byName[key]=byName[key]||{place:t.place,km:0,n:0,far,trips:0}).km+=t.km;
+  byName[key].n+=t.items.length;byName[key].trips++;if(far)byName[key].far=true;});
+ const pts=Object.values(byName);
+ if(!pts.length){$("map").innerHTML='<svg viewBox="0 0 1000 200"><text x="500" y="100" text-anchor="middle" class="mlabel">Нет поездок для отображения</text></svg>';return;}
+
+ // проекция (равнопромежуточная с поправкой на широту)
+ const BW=1000,BH=460,PAD=64;
+ const lats=[KRD[0],...pts.map(p=>p.place.lat)],lons=[KRD[1],...pts.map(p=>p.place.lon)];
+ let latMin=Math.min(...lats),latMax=Math.max(...lats),lonMin=Math.min(...lons),lonMax=Math.max(...lons);
+ if(latMax-latMin<0.4){latMax+=0.25;latMin-=0.25;} if(lonMax-lonMin<0.4){lonMax+=0.25;lonMin-=0.25;}
+ const latMid=(latMin+latMax)/2,kx=Math.cos(latMid*Math.PI/180);
+ const gw=(lonMax-lonMin)*kx,gh=(latMax-latMin);
+ const s=Math.min((BW-2*PAD)/gw,(BH-2*PAD)/gh);
+ const offx=PAD+((BW-2*PAD)-gw*s)/2,offy=PAD+((BH-2*PAD)-gh*s)/2;
+ const proj=(lat,lon)=>[offx+(lon-lonMin)*kx*s, offy+(latMax-lat)*s];
+ const [kx0,ky0]=proj(KRD[0],KRD[1]);
+
+ // сетка-ориентир (целые градусы)
+ let grid="";
+ for(let lo=Math.ceil(lonMin);lo<=Math.floor(lonMax);lo++){const [x]=proj(latMid,lo);
+  grid+=`<line x1="${x.toFixed(0)}" y1="${offy-6}" x2="${x.toFixed(0)}" y2="${(BH-offy+6).toFixed(0)}" stroke="#e3ebf2" stroke-width="1"/>`+
+        `<text x="${x.toFixed(0)}" y="${(BH-offy+20).toFixed(0)}" text-anchor="middle" font-size="9" fill="#a9b6c4">${lo}°E</text>`;}
+ for(let la=Math.ceil(latMin);la<=Math.floor(latMax);la++){const [,y]=proj(la,lonMid());
+  grid+=`<line x1="${(offx-6).toFixed(0)}" y1="${y.toFixed(0)}" x2="${(BW-offx+6).toFixed(0)}" y2="${y.toFixed(0)}" stroke="#e3ebf2" stroke-width="1"/>`+
+        `<text x="${(offx-10).toFixed(0)}" y="${(y+3).toFixed(0)}" text-anchor="end" font-size="9" fill="#a9b6c4">${la}°N</text>`;}
+ function lonMid(){return (lonMin+lonMax)/2;}
+
+ // линии база→район
+ let lines="";
+ pts.forEach(p=>{const [x,y]=proj(p.place.lat,p.place.lon);const col=p.far?"#6b46c1":"#005B9C";
+  lines+=`<line x1="${kx0.toFixed(0)}" y1="${ky0.toFixed(0)}" x2="${x.toFixed(0)}" y2="${y.toFixed(0)}" stroke="${col}" stroke-width="1.3" opacity="0.4"${p.far?' stroke-dasharray="5,5"':''}/>`;});
+
+ // маркеры районов
+ let dots="";
+ pts.sort((a,b)=>b.place.lat-a.place.lat).forEach(p=>{const [x,y]=proj(p.place.lat,p.place.lon);
+  const r=Math.min(6+p.n*1.5,20),col=p.far?"#6b46c1":"#005B9C";
+  const lx=x+r+3, anchor=(x>BW-160)?"end":"start", tx=(x>BW-160)?x-r-3:lx;
+  dots+=`<g><title>${esc(p.place.name)}\nобъектов: ${p.n} · опор: ${h1(p.km)} км · поездок: ${p.trips}${p.far?" · ДАЛЬНИЙ (ночёвка)":""}</title>`+
+    `<circle class="mdot" cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="${r.toFixed(1)}" fill="${col}" fill-opacity="0.82" stroke="#fff" stroke-width="1.5"/>`+
+    `<text class="mlabel" x="${tx.toFixed(0)}" y="${(y+3).toFixed(0)}" text-anchor="${anchor}">${esc(p.place.name)}${p.n>1?` · ${p.n}`:""}</text></g>`;});
+
+ // база Краснодар
+ const depot=`<g><title>Краснодар — база выездов</title>`+
+   `<circle cx="${kx0.toFixed(0)}" cy="${ky0.toFixed(0)}" r="8" fill="#b8362a" stroke="#fff" stroke-width="2"/>`+
+   `<text class="mlabel depot" x="${(kx0+12).toFixed(0)}" y="${(ky0+4).toFixed(0)}">Краснодар</text></g>`;
+
+ $("map").innerHTML=`<svg viewBox="0 0 ${BW} ${BH}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">`+
+   `<rect x="0" y="0" width="${BW}" height="${BH}" fill="#f7fafc"/>${grid}${lines}${dots}${depot}</svg>`;
+}
+
+/* ═══════════ ЗАГРУЗКА ═══════════ */
+function showMsg(h,bad){$("msg").innerHTML=h?`<div class="note ${bad?"":""}">${h}</div>`:"";}
+async function load(){
+ let text=null;
+ for(const base of SOURCES){const url=base+(base.includes("?")?"&":"?")+"_cb="+Date.now();
+  try{const res=await fetch(url,{cache:"no-store"});if(!res.ok)continue;const t=await res.text();
+   if(/^\s*</.test(t))continue;text=t;break;}catch(e){}}
+ if(text===null){$("dot").classList.add("bad");$("upd").textContent="нет доступа к таблице";
+  showMsg("<b>Таблица не читается.</b> Проверьте публикацию в интернете (Файл → Опубликовать в интернете → CSV).",true);return;}
+ const rows=parseCSV(text).filter(r=>r.some(c=>c&&c.trim()!==""));
+ let hi=rows.findIndex(r=>r.some(c=>nm(c).includes("пэс")));if(hi<0)hi=0;
+ const H=mapHeaders(rows[hi]||[]);
+ const out=[];
+ for(let i=hi+1;i<rows.length;i++){const r=rows[i],get=k=>H[k]!=null?(r[H[k]]||"").trim():"";
+  const cust=get("cust"),obj=get("obj");if(!cust&&!obj)continue;
+  const pes=get("pes")||"—";
+  const place=resolvePlace(obj+" "+cust)||resolveByPes(pes);
+  out.push({pes,cust,obj,pred:get("pred"),km:num(get("km")),
+   payState:payState(get("pay")),excl:/^да$/i.test(get("excl")),
+   e3done:!!get("e3"),status:get("status"),statusDone:statusDone(get("status")),place});}
+ RAW=out;
+ const keep=$("fPes").value;
+ $("fPes").innerHTML='<option value="">Все ПЭС</option>'+
+  [...new Set(RAW.filter(o=>!o.excl&&!o.statusDone).map(o=>o.pes))].sort((a,b)=>a.localeCompare(b,"ru")).map(n=>`<option>${esc(n)}</option>`).join("");
+ $("fPes").value=keep;
+ $("dot").classList.remove("bad");
+ $("upd").textContent="обновлено "+new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"});
+ render();
+}
+
+["pKm","pH","pDrive","pInsp","pRoad"].forEach(id=>$(id).addEventListener("input",render));
+["fPes","onlyPaid"].forEach(id=>$(id).addEventListener("change",render));
+$("refresh").addEventListener("click",load);
+$("foot").innerHTML="Координаты — приблизительные центры районов; объект привязывается к району по адресу, "+
+ "а если не распознан — к зоне своего ПЭС (маркер «≈ по зоне ПЭС»). Время выезда = дорога туда-обратно + обследование; "+
+ "параметры скорости настраиваются ползунками. Для маршрутов по точным адресам нужна геокодировка (отдельный этап).";
+load();
+setInterval(load,REFRESH_MS);
+</script>
+<script src="ppo-core.js?v=3.6.3"></script>
+<script src="ppo-refs.js?v=3.6.3"></script>
+<script>PPO.mountNav("vyezdy.html");</script>
+</body>
+</html>

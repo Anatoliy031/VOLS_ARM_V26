@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Измерительные инструменты · ППО ВОЛС</title>
+<link rel="stylesheet" href="ppo-ui.css?v=3.6.3">
+<style>
+.tool{background:#fff;border:1px solid var(--line-s);border-radius:var(--r);box-shadow:var(--sh);margin-bottom:12px;overflow:hidden}
+.tool > summary{list-style:none;cursor:pointer;padding:16px 18px;display:flex;gap:14px;align-items:center}
+.tool > summary::-webkit-details-marker{display:none}
+.tool .ic{width:40px;height:40px;flex:0 0 auto;border-radius:10px;background:var(--blue-l);color:var(--blue-d);
+  display:grid;place-items:center;font-size:19px}
+.tool .h b{display:block;font-size:16px;font-weight:700}
+.tool .h span{display:block;font-size:13px;color:var(--muted);margin-top:2px;line-height:1.4}
+.tool .caret{margin-left:auto;color:var(--muted);font-size:13px;font-weight:700;flex:0 0 auto}
+.tool[open] .caret{transform:rotate(90deg)}
+.tool .body{padding:0 18px 18px;border-top:1px solid var(--line-s);padding-top:16px}
+
+.read{font-variant-numeric:tabular-nums;font-weight:800;letter-spacing:-.02em}
+.bigread{background:var(--blue-d);color:#fff;border-radius:12px;padding:18px;text-align:center;margin-bottom:14px}
+.bigread .v{font-size:40px;line-height:1;font-variant-numeric:tabular-nums;font-weight:800}
+.bigread .u{font-size:14px;opacity:.8;margin-top:6px}
+.bigread.ok{background:var(--ok)} .bigread.bad{background:var(--bad)}
+.bigread small{display:block;font-size:12.5px;opacity:.85;margin-top:8px;font-weight:500}
+
+.level{height:16px;border-radius:999px;background:var(--line-s);position:relative;margin:12px 0 6px;overflow:hidden}
+.level i{position:absolute;top:0;bottom:0;width:4px;background:var(--blue);left:50%;transform:translateX(-50%);border-radius:2px}
+.level::before{content:'';position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--muted);opacity:.4}
+
+.serie{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.serie span{background:var(--blue-l);border-radius:7px;padding:5px 10px;font-size:13.5px;font-variant-numeric:tabular-nums;
+  display:inline-flex;gap:7px;align-items:center}
+.serie span.out{background:var(--bad-bg);color:var(--bad);text-decoration:line-through}
+.serie span b{cursor:pointer;opacity:.5}
+
+.ruler{border:1px solid var(--line);border-radius:10px;padding:14px;background:#fff;margin-top:12px}
+.ruler .lines{display:flex;flex-direction:column;gap:11px;margin-top:10px}
+.ruler .lines div{display:flex;align-items:center;gap:12px;font-size:13px}
+.ruler .lines i{display:block;background:#111;height:26px;flex:0 0 auto}
+.card-cal{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:13px}
+
+.res{border:1px solid var(--line-s);border-radius:10px;padding:12px 14px;margin-top:12px;background:#FAFCFE;font-size:13.5px}
+.res b{font-variant-numeric:tabular-nums}
+.res table{width:100%;border-collapse:collapse;font-size:13px}
+.res td{padding:4px 0;border-bottom:1px solid var(--line-s)}
+.res td:last-child{text-align:right;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+</style>
+</head>
+<body>
+
+<header class="ppo-top"><div class="ppo-top-in">
+  <div class="ppo-mark">ППО</div>
+  <div class="ppo-brand"><b>Измерительные инструменты</b><span id="objline">объект не задан</span></div>
+  <nav id="ppoNav"></nav>
+</div></header>
+
+<div class="wrap narrow">
+
+  <div class="note"><b>Как это работает</b>
+    Инструменты считают величину и сразу сверяют её с нормативом по вашему объекту.
+    Кнопка «Записать в измерения» переносит результат в осмотр — вручную ничего перепечатывать не нужно.
+    Опор можно отметить сразу несколько: одно значение запишется отдельной строкой на каждую —
+    удобно, когда результат одинаков для всей линии или для группы однотипных опор.
+    Датчики телефона дают ориентировочную точность: для отчёта пользуйтесь поверенным прибором,
+    а калькулятор берите для проверки и для пересчёта.</div>
+
+  <!-- ================================================== 1. КРЕНОМЕТР -->
+  <details class="tool" id="t-kren">
+    <summary><div class="ic">📐</div><div class="h"><b>Отклонение стойки от вертикали</b>
+      <span>Приложите телефон к стойке — или введите угол, снятый угломером</span></div>
+      <div class="caret">›</div></summary>
+    <div class="body">
+      <div class="bigread" id="k_read"><div class="v">—</div><div class="u">угол наклона</div></div>
+      <div class="level"><i id="k_bar"></i></div>
+      <div class="btnrow" style="margin-bottom:14px">
+        <button class="btn ghost" id="k_start">Включить датчик наклона</button>
+        <button class="btn ghost sm" id="k_hold">Зафиксировать</button>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Угол отклонения от вертикали, град</label>
+          <input type="number" id="k_deg" step="0.1" placeholder="например 0,5"></div>
+        <div class="field"><label>Высота опоры (надземная часть), м</label>
+          <input type="number" id="k_h" step="0.1" placeholder="8,2"></div>
+      </div>
+      <div class="mini" id="k_dev" style="margin:-4px 0 12px">Отклонение верха от отвеса посчитается по углу и высоте.</div>
+      <div class="field"><label>Опоры</label><div id="k_pole"></div></div>
+      <div id="k_out"></div>
+    </div>
+  </details>
+
+  <!-- ================================================== 2. ВЫСОТОМЕР -->
+  <details class="tool" id="t-vys">
+    <summary><div class="ic">📏</div><div class="h"><b>Высота опоры и точки подвеса</b>
+      <span>По углу визирования и расстоянию до опоры</span></div><div class="caret">›</div></summary>
+    <div class="body">
+      <div class="bigread" id="v_read"><div class="v">—</div><div class="u">высота от земли</div></div>
+      <div class="btnrow" style="margin-bottom:14px">
+        <button class="btn ghost" id="v_start">Наклон телефона как угломер</button>
+        <span class="mini" id="v_ang">угол: —</span>
+      </div>
+      <div class="grid3">
+        <div class="field"><label>Угол визирования, °</label><input type="number" id="v_a" step="0.1"></div>
+        <div class="field"><label>Расстояние до опоры, м</label><input type="number" id="v_d" step="0.1"></div>
+        <div class="field"><label>Высота глаз, м</label><input type="number" id="v_e" step="0.05" value="1.6"></div>
+      </div>
+      <p class="mini">Расстояние удобно взять дальномером или из координат соседних опор — см. инструмент «Пролёты по координатам».
+         Высота нужна кренометру и для проверки габарита.</p>
+      <div class="btnrow"><button class="btn ghost" id="v_use">Подставить в кренометр</button></div>
+      <div id="v_out"></div>
+    </div>
+  </details>
+
+  <!-- =============================================== 3. ГАБАРИТ ДО ЗЕМЛИ -->
+  <details class="tool" id="t-gab">
+    <summary><div class="ic">↕</div><div class="h"><b>Габарит до земли</b>
+      <span>Прямой замер или расчёт через стрелу провеса</span></div><div class="caret">›</div></summary>
+    <div class="body">
+      <div class="field"><label>Что проверяем</label>
+        <div class="chips" id="g_what">
+          <span class="chip on" data-k="gz_prov">Нижний провод ВЛ</span>
+          <span class="chip" data-k="gz_oksn">Проектируемый кабель</span>
+        </div></div>
+      <div class="grid2">
+        <div class="field"><label>Замеренный габарит, м</label><input type="number" id="g_val" step="0.1"></div>
+        <div class="field"><label>Опоры</label><div id="g_pole"></div></div>
+      </div>
+      <h3 class="blk">Если габарит считается, а не меряется</h3>
+      <p class="mini">Габарит в середине пролёта = высота точки подвеса − стрела провеса. Стрела считается
+         по приближению f ≈ q·L²/(8·H): q — погонная нагрузка, L — пролёт, H — тяжение.
+         Это оценка для полевой проверки, точный расчёт — в проекте.</p>
+      <div class="grid3">
+        <div class="field"><label>Высота подвеса, м</label><input type="number" id="g_hp" step="0.1"></div>
+        <div class="field"><label>Пролёт, м</label><input type="number" id="g_l" step="1"></div>
+        <div class="field"><label>Погонная масса, кг/км</label><input type="number" id="g_q" step="1" placeholder="105"></div>
+        <div class="field"><label>Тяжение, кН</label><input type="number" id="g_t" step="0.1" placeholder="4"></div>
+      </div>
+      <div class="btnrow"><button class="btn ghost" id="g_calc">Посчитать стрелу и габарит</button></div>
+      <div id="g_out"></div>
+    </div>
+  </details>
+
+  <!-- ============================================ 4. ПРОЧНОСТЬ БЕТОНА -->
+  <details class="tool" id="t-bet">
+    <summary><div class="ic">🧱</div><div class="h"><b>Прочность бетона по серии ударов</b>
+      <span>Обработка серии по ГОСТ 22690-2015 с отбраковкой</span></div><div class="caret">›</div></summary>
+    <div class="body">
+      <p class="mini">Введите показания прибора по одному участку (не менее 6 отсчётов по ГОСТ 22690).
+         Значения, отличающиеся от среднего более чем на 10 %, отбрасываются, среднее пересчитывается.</p>
+      <div class="btnrow" style="margin-bottom:10px">
+        <input type="number" id="b_in" step="0.1" placeholder="МПа" style="width:120px;padding:10px 12px;border:1px solid var(--line);border-radius:8px">
+        <button class="btn ghost" id="b_add">Добавить отсчёт</button>
+        <button class="btn ghost sm" id="b_clr">Очистить</button>
+      </div>
+      <div class="serie" id="b_serie"></div>
+      <div class="grid2">
+        <div class="field"><label>Проектный класс бетона, МПа</label><input type="number" id="b_cls" value="30" step="1"></div>
+        <div class="field"><label>Опоры</label><div id="b_pole"></div></div>
+      </div>
+      <div id="b_out"></div>
+    </div>
+  </details>
+
+  <!-- ================================================ 5. ТРЕЩИНОМЕР -->
+  <details class="tool" id="t-cr">
+    <summary><div class="ic">〰</div><div class="h"><b>Ширина раскрытия трещин</b>
+      <span>Экранный эталон с калибровкой по банковской карте</span></div><div class="caret">›</div></summary>
+    <div class="body">
+      <div class="ruler">
+        <div class="card-cal">
+          <span>Приложите к экрану банковскую карту и подгоните ползунком под её длину (85,6 мм):</span>
+          <input type="range" id="c_cal" min="1.5" max="6" step="0.01" value="3.78" style="flex:1;min-width:180px">
+        </div>
+        <div id="c_card" style="height:32px;border:2px dashed var(--blue-2);border-radius:6px;margin-top:10px;
+             display:grid;place-items:center;font-size:12px;color:var(--blue-d)">85,6 мм</div>
+        <div class="lines" id="c_lines"></div>
+      </div>
+      <div class="grid2" style="margin-top:14px">
+        <div class="field"><label>Ширина раскрытия, мм</label><input type="number" id="c_val" step="0.05"></div>
+        <div class="field"><label>Допускается по типовому проекту, мм</label><input type="number" id="c_ref" step="0.05" value="0.2"></div>
+        <div class="field"><label>Опоры</label><div id="c_pole"></div></div>
+      </div>
+      <div id="c_out"></div>
+    </div>
+  </details>
+
+  <!-- ============================================= 6. ЗАЗЕМЛЕНИЕ -->
+  <details class="tool" id="t-zaz">
+    <summary><div class="ic">⏚</div><div class="h"><b>Сопротивление заземляющего устройства</b>
+      <span>Норматив подставляется по удельному сопротивлению грунта</span></div><div class="caret">›</div></summary>
+    <div class="body">
+      <div class="grid3">
+        <div class="field"><label>Замеренное сопротивление, Ом</label><input type="number" id="z_val" step="0.1"></div>
+        <div class="field"><label>Удельное сопротивление грунта ρ, Ом·м</label><input type="number" id="z_ro" step="10" value="100"></div>
+        <div class="field"><label>Опоры</label><div id="z_pole"></div></div>
+      </div>
+      <p class="mini">Ориентиры по ρ: чернозём и суглинок влажный — 30…100; супесь — 150…400;
+         песок — 400…1000; скальный грунт — свыше 2000 Ом·м. Точное значение берётся из протокола измерений.</p>
+      <div id="z_out"></div>
+    </div>
+  </details>
+
+  <!-- ============================================ 7. ПРОЛЁТЫ ПО GPS -->
+  <details class="tool" id="t-dist">
+    <summary><div class="ic">🛰</div><div class="h"><b>Пролёты по координатам</b>
+      <span>Расстояние между точками и автозаполнение пролётов всей линии</span></div><div class="caret">›</div></summary>
+    <div class="body">
+      <div class="grid2">
+        <div class="field"><label>Точка 1</label><select id="d_a"></select></div>
+        <div class="field"><label>Точка 2</label><select id="d_b"></select></div>
+      </div>
+      <div class="btnrow" style="margin-bottom:8px">
+        <button class="btn ghost" id="d_here">Взять текущую позицию как точку 1</button>
+      </div>
+      <div id="d_out"></div>
+      <h3 class="blk">Заполнить пролёты по всей линии</h3>
+      <p class="mini">Если у опор проставлены координаты, пролёт каждой опоры до следующей посчитается
+         автоматически. Порядок берётся такой же, как в списке опор.</p>
+      <div class="btnrow"><button class="btn" id="d_fill">Посчитать и записать пролёты</button></div>
+      <div id="d_fillout"></div>
+    </div>
+  </details>
+
+  <!-- ======================================== 8. КОМПОНОВКА ОКСН -->
+  <details class="tool" id="t-komp">
+    <summary><div class="ic">⚡</div><div class="h"><b>Компоновка ОКСН на опоре</b>
+      <span>Пять нормируемых расстояний за один заход</span></div><div class="caret">›</div></summary>
+    <div class="body">
+      <p class="mini">Заполните то, что замерили — пустые поля пропускаются.
+         Нормативы подставляются по классу напряжения объекта.</p>
+      <div class="field"><label>Опоры</label><div id="x_pole"></div></div>
+      <div class="grid2" id="x_fields"></div>
+      <div id="x_out"></div>
+    </div>
+  </details>
+
+  <!-- ====================================== 9. НЕСУЩАЯ СПОСОБНОСТЬ -->
+  <details class="tool" id="t-mom">
+    <summary><div class="ic">⚖</div><div class="h"><b>Запас несущей способности опоры</b>
+      <span>Прикидка изгибающего момента до и после подвески ОК</span></div><div class="caret">›</div></summary>
+    <div class="body">
+      <div class="note warn" style="margin-top:0"><b>Это оценка, а не поверочный расчёт</b>
+        Служит для отсева заведомо перегруженных опор в поле. Поверочный расчёт по ПУЭ-7 и
+        СП 20.13330.2016 выполняется в проектной документации пользователя (пп. 5.1 и 6 ТТ № 282р).</div>
+      <div class="grid2">
+        <div class="field"><label>Марка опоры</label><select id="n_mark"></select></div>
+        <div class="field"><label>Ветровой / весовой пролёт, м</label><input type="number" id="n_l" value="50" step="1"></div>
+        <div class="field"><label>Район по ветру (ПУЭ-7 табл. 2.5.1)</label><select id="n_w"></select></div>
+        <div class="field"><label>Район по гололёду (ПУЭ-7 табл. 2.5.3)</label><select id="n_i"></select></div>
+        <div class="field"><label>Тип местности по ветру (п. 2.5.6)</label>
+          <select id="n_t"><option value="1.0">А — открытая</option><option value="0.65" selected>В — застроенная</option>
+          <option value="0.40">С — плотная застройка</option></select></div>
+        <div class="field"><label>Размещаемый кабель</label><select id="n_cab"></select></div>
+      </div>
+      <p class="mini">Существующая подвеска берётся из осмотра (раздел «Кабели» → «Существующая подвеска»).</p>
+      <div id="n_out"></div>
+    </div>
+  </details>
+
+  <!-- ====================================== 10. ЁМКОСТЬ ОПОРЫ -->
+  <details class="tool" id="t-cap">
+    <summary><div class="ic">🔢</div><div class="h"><b>Сколько кабелей ещё поместится</b>
+      <span>Свободная зона на стойке с учётом нормируемых зазоров</span></div><div class="caret">›</div></summary>
+    <div class="body">
+      <div class="grid3">
+        <div class="field"><label>Высота нижней точки крепления провода ВЛ, м</label><input type="number" id="q_hp" step="0.1" placeholder="8,2"></div>
+        <div class="field"><label>Уже размещено кабелей связи, шт</label><input type="number" id="q_n" step="1" value="0"></div>
+        <div class="field"><label>Требуемый габарит ОК до земли, м</label><input type="number" id="q_g" step="0.1" value="5"></div>
+      </div>
+      <div id="q_out"></div>
+    </div>
+  </details>
+
+  <div class="card">
+    <h2>Записанные за этот заход измерения</h2>
+    <p class="sub">Накапливаются здесь, пока не отправите их в осмотр.</p>
+    <div id="basket"></div>
+    <div class="btnrow" style="margin-top:12px">
+      <button class="btn" id="send" disabled>Отправить в осмотр</button>
+      <button class="btn ghost" id="clearb" disabled>Очистить</button>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="ppo-core.js?v=3.6.3"></script>
+<script src="ppo-refs.js?v=3.6.3"></script>
+<script>
+'use strict';
+var D = PPO.load(), C = PPO.ctx(), BASKET = [];
+/* объект изменён в другой вкладке — перечитываем и перерисовываем */
+document.addEventListener('ppo:external', function(){
+  D = PPO.load(); C = PPO.ctx();
+  if (typeof paintAll === 'function') paintAll();
+  else if (typeof paint === 'function') paint();
+});
+/* Норматив зависит от класса напряжения и характера местности КОНКРЕТНОЙ опоры.
+   Раньше все калькуляторы считали по наибольшему классу объекта: на смешанном
+   участке 0,4/10 кВ габарит провода до земли для опор 0,4 кВ завышался на метр.
+   Пока опора не выбрана, остаётся общий контекст объекта. */
+function ctxOfPick(poleSelId){
+  var ps = polesOf(poleSelId);
+  return ps.length ? PPO.ctxForPole(ps[0]) : C;
+}
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s===undefined||s===null?'':s)
+  .replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function toast(m,bad){ var t=$('toast'); t.textContent=m; t.className='toast on'+(bad?' bad':'');
+  setTimeout(function(){t.className='toast';},2600); }
+function nf(n,k){ return String(Number(n).toFixed(k===undefined?2:k)).replace('.',','); }
+
+PPO.mountNav('pribory.html');
+$('objline').textContent = D.pass['ОБЪЕКТ_НАИМ'] || 'объект не задан';
+
+/* --------- общие: выпадающие списки опор и СИ --------- */
+/* к каждому инструменту — свой выбор опор, можно отметить сразу несколько */
+var PICK = {};
+['k_pole','g_pole','b_pole','c_pole','z_pole','x_pole'].forEach(function(id){
+  if ($(id)) PICK[id] = PPO.mountPolePicker(id, { onChange:function(){ onPick(id); } });
+});
+function polesOf(id){ return PICK[id] ? PICK[id].poles() : []; }
+function onPick(id){
+  if (id === 'k_pole'){
+    var ps = polesOf('k_pole');
+    if (ps.length && ps[0].mark && !$('k_h').value){
+      var r = PPO.poleByMark(ps[0].mark);
+      if (r){ $('k_h').value = r.h; $('k_h').dispatchEvent(new Event('input')); }
+    }
+  }
+}
+function siFor(kindId){
+  /* Отклонение стойки от вертикали измеряется УГЛОМЕРОМ: величина, которую
+     теперь вводит исполнитель, — угол, а не расстояние. Тахеометр в этой
+     графе не проходил бы проверку применимости средства измерения. */
+  var pick = { vert:'УОМ', beton:'ИПС', gz_prov:'Тахеометр', gz_oksn:'Тахеометр',
+               zazem:'ИС-', crack:'ЛИ-', d_oksn_prov:'Р50', d_oksn_elem:'Р50', d_vert:'Р50', d_horiz:'Р50' };
+  var want = pick[kindId] || '';
+  var hit = D.si.filter(function(s){ return want && String(s.mark||'').indexOf(want)>=0; })[0];
+  /* марки не нашлось — берём любой прибор, пригодный для этого вида измерения
+     по своему виду, и только потом первый попавшийся */
+  if (!hit) hit = D.si.filter(function(s){
+    return PPO.siFits(String(s.name||'') + ' ' + String(s.mark||''), kindId) === 1; })[0];
+  return hit ? hit.mark : (D.si[0] ? D.si[0].mark : '');
+}
+
+/* --------- корзина результатов --------- */
+function put(kindId, vals, poleSelId, srcName){
+  var r = PPO.evalMeas(kindId, vals, ctxOfPick(poleSelId));
+  if (!r){ toast('Не хватает данных для вывода', true); return; }
+  var ps = polesOf(poleSelId);
+  if (!ps.length) ps = [null];                 // измерение без привязки к опоре
+  ps.forEach(function(p){
+    /* по каждой опоре вывод пересчитывается заново — одно и то же измеренное
+       число при разных классах напряжения даёт разный вывод */
+    var rr = PPO.evalMeas(kindId, vals, p ? PPO.ctxForPole(p) : C) || r;
+    BASKET.push({ kindId:rr.id, name:rr.name, place:rr.place, value:rr.value, unit:rr.unit, norm:rr.norm,
+                  verdict:rr.verdict, si:siFor(rr.id), vals:vals, pole:p?p.num:'', line:p?p.line:'',
+                  kv:p?String(p.kv||''):'', src:srcName || 'полевой калькулятор' });
+  });
+  paintBasket();
+  toast(ps.length > 1 ? ('Записано на опор: ' + ps.length) : ('Записано: ' + r.name));
+}
+function paintBasket(){
+  if (!BASKET.length){
+    $('basket').innerHTML = '<div class="empty"><b>Пока пусто</b>Посчитайте что-нибудь выше и нажмите «Записать в измерения».</div>';
+    $('send').disabled = true; $('clearb').disabled = true; return;
+  }
+  $('basket').innerHTML = '<div class="tblwrap"><table class="tbl"><tr><th>Измерение</th><th>Опора</th><th>Значение</th><th>Вывод</th><th></th></tr>' +
+    BASKET.map(function(b,i){
+      var bad = b.verdict.indexOf('не соответствует')===0;
+      return '<tr><td>'+esc(b.name)+'</td><td>'+esc(b.pole||'—')+'</td>' +
+        '<td><b>'+esc(b.value)+'</b> '+esc(b.unit==='—'?'':b.unit)+'</td>' +
+        '<td><span class="tag '+(bad?'bad':'ok')+'">'+esc(b.verdict)+'</span></td>' +
+        '<td><button class="btn ghost sm" data-rm="'+i+'">✕</button></td></tr>'; }).join('') + '</table></div>';
+  Array.prototype.forEach.call($('basket').querySelectorAll('[data-rm]'), function(b){
+    b.onclick = function(){ BASKET.splice(+b.dataset.rm,1); paintBasket(); };
+  });
+  $('send').disabled = false; $('clearb').disabled = false;
+}
+$('send').onclick = function(){
+  sessionStorage.setItem('ppo_meas_in', JSON.stringify(BASKET));
+  location.href = 'osmotr.html#meas';
+};
+$('clearb').onclick = function(){ BASKET = []; paintBasket(); };
+paintBasket();
+
+function outBox(el, r, kindId, vals, poleSel){
+  if (!r){ el.innerHTML = ''; return; }
+  var bad = r.verdict.indexOf('не соответствует')===0;
+  el.innerHTML = '<div class="bigread '+(bad?'bad':'ok')+'"><div class="v">'+esc(r.value)+'</div>' +
+    '<div class="u">'+esc(r.unit==='—'?r.name:r.unit)+'</div>' +
+    '<small>'+esc(r.norm)+' — '+esc(r.verdict)+'</small></div>' +
+    '<div class="btnrow"><button class="btn" data-save="1">Записать в измерения</button></div>';
+  el.querySelector('[data-save]').onclick = function(){ put(kindId, vals, poleSel); };
+}
+
+/* ==================================================== 1. КРЕНОМЕТР */
+(function(){
+  var live = null, held = false;
+  function angleFrom(e){
+    var b = e.beta || 0, g = e.gamma || 0;
+    return Math.round(Math.sqrt(b*b + g*g)*10)/10;
+  }
+  function onOrient(e){
+    if (held) return;
+    var a = angleFrom(e);
+    a = a > 90 ? 180 - a : a;
+    live = a;
+    $('k_read').querySelector('.v').textContent = nf(a,1) + '°';
+    $('k_bar').style.left = Math.max(2, Math.min(98, 50 + a*4)) + '%';
+    /* В измерение уходит сам угол: миллиметры теперь производная величина и
+       считаются ядром. Раньше датчик пересчитывал угол в отклонение верха, и
+       обратный пересчёт в 1/N шёл через два округления. */
+    $('k_deg').value = nf(a,2).replace(',', '.');
+    recalc();
+  }
+  $('k_start').onclick = function(){
+    function bind(){ window.addEventListener('deviceorientation', onOrient); $('k_start').textContent = 'Датчик включён'; }
+    if (typeof DeviceOrientationEvent !== 'undefined' && DeviceOrientationEvent.requestPermission){
+      DeviceOrientationEvent.requestPermission().then(function(s){
+        if (s === 'granted') bind(); else toast('Доступ к датчику не разрешён', true);
+      }).catch(function(){ toast('Датчик недоступен в этом браузере', true); });
+    } else if ('ondeviceorientation' in window) bind();
+    else toast('Устройство не отдаёт наклон — вводите отклонение вручную', true);
+  };
+  $('k_hold').onclick = function(){ held = !held; $('k_hold').textContent = held ? 'Отпустить' : 'Зафиксировать'; };
+  function recalc(){
+    var vals = { deg:$('k_deg').value, h:$('k_h').value };
+    var r = PPO.evalMeas('vert', vals, ctxOfPick('k_pole'));
+    $('k_dev').textContent = (r && r.detail)
+      ? r.detail
+      : 'Отклонение верха от отвеса посчитается по углу и высоте.';
+    outBox($('k_out'), r, 'vert', vals, 'k_pole');
+  }
+  $('k_deg').oninput = $('k_h').oninput = recalc;
+  /* высота подставляется в onPick() при выборе опор */
+})();
+
+/* ==================================================== 2. ВЫСОТОМЕР */
+(function(){
+  function calc(){
+    var a = parseFloat($('v_a').value), d = parseFloat($('v_d').value), e = parseFloat($('v_e').value)||1.6;
+    if (!(a>0) || !(d>0)){ $('v_read').querySelector('.v').textContent = '—'; $('v_out').innerHTML=''; return null; }
+    var h = d*Math.tan(a*Math.PI/180) + e;
+    $('v_read').querySelector('.v').textContent = nf(h,1) + ' м';
+    $('v_out').innerHTML = '<div class="res"><table>' +
+      '<tr><td>Превышение над уровнем глаз</td><td>'+nf(d*Math.tan(a*Math.PI/180),2)+' м</td></tr>' +
+      '<tr><td>Высота глаз</td><td>'+nf(e,2)+' м</td></tr>' +
+      '<tr><td>Итого высота от земли</td><td>'+nf(h,2)+' м</td></tr></table></div>';
+    return h;
+  }
+  ['v_a','v_d','v_e'].forEach(function(id){ $(id).oninput = calc; });
+  $('v_start').onclick = function(){
+    function bind(){
+      window.addEventListener('deviceorientation', function(e){
+        var b = Math.abs(e.beta||0); var ang = Math.round((90 - Math.abs(90-b))*10)/10;
+        $('v_ang').textContent = 'угол: ' + nf(Math.abs(90 - b),1) + '°  (нажмите, чтобы подставить)';
+        $('v_ang').dataset.a = Math.abs(90-b).toFixed(1);
+      });
+      $('v_start').textContent = 'Угломер включён';
+    }
+    if (typeof DeviceOrientationEvent !== 'undefined' && DeviceOrientationEvent.requestPermission)
+      DeviceOrientationEvent.requestPermission().then(function(s){ if (s==='granted') bind(); });
+    else if ('ondeviceorientation' in window) bind();
+    else toast('Устройство не отдаёт наклон', true);
+  };
+  $('v_ang').onclick = function(){ if (this.dataset.a){ $('v_a').value = this.dataset.a; calc(); } };
+  $('v_use').onclick = function(){
+    var h = calc(); if (!h) { toast('Сначала посчитайте высоту', true); return; }
+    $('k_h').value = nf(h,1).replace(',','.');
+    $('t-kren').open = true; $('t-kren').scrollIntoView({behavior:'smooth'});
+    $('k_h').dispatchEvent(new Event('input'));
+    toast('Высота подставлена в кренометр');
+  };
+})();
+
+/* ================================================ 3. ГАБАРИТ ДО ЗЕМЛИ */
+(function(){
+  var kind = 'gz_prov';
+  Array.prototype.forEach.call($('g_what').querySelectorAll('.chip'), function(el){
+    el.onclick = function(){
+      Array.prototype.forEach.call($('g_what').querySelectorAll('.chip'), function(x){ x.classList.remove('on'); });
+      el.classList.add('on'); kind = el.dataset.k; recalc();
+    };
+  });
+  function recalc(){
+    var vals = { val:$('g_val').value };
+    outBox($('g_out'), PPO.evalMeas(kind, vals, ctxOfPick('g_pole')), kind, vals, 'g_pole');
+  }
+  $('g_val').oninput = recalc;
+  $('g_calc').onclick = function(){
+    var hp = parseFloat($('g_hp').value), L = parseFloat($('g_l').value),
+        q = parseFloat($('g_q').value), T = parseFloat($('g_t').value);
+    if (!(hp>0)||!(L>0)||!(q>0)||!(T>0)){ toast('Заполните все четыре поля', true); return; }
+    var w = q/1000*9.81;                 // Н/м
+    var f = w*L*L/(8*T*1000);            // м
+    var g = hp - f;
+    $('g_val').value = g.toFixed(2);
+    recalc();
+    $('g_out').insertAdjacentHTML('afterbegin', '<div class="res"><table>' +
+      '<tr><td>Погонная нагрузка</td><td>'+nf(w,2)+' Н/м</td></tr>' +
+      '<tr><td>Стрела провеса</td><td>'+nf(f,2)+' м</td></tr>' +
+      '<tr><td>Габарит в середине пролёта</td><td>'+nf(g,2)+' м</td></tr></table>' +
+      '<p class="mini" style="margin:8px 0 0">Расчёт по приближению параболы без учёта гололёда, ветра и температуры. ' +
+      'Точная стрела провеса — в монтажных таблицах проекта.</p></div>');
+  };
+})();
+
+/* ============================================= 4. ПРОЧНОСТЬ БЕТОНА */
+(function(){
+  var S = [];
+  function stats(){
+    if (!S.length) return null;
+    var m0 = S.reduce(function(a,b){return a+b;},0)/S.length;
+    var keep = S.filter(function(v){ return Math.abs(v-m0) <= 0.10*m0; });
+    var out  = S.filter(function(v){ return Math.abs(v-m0) >  0.10*m0; });
+    var m = keep.length ? keep.reduce(function(a,b){return a+b;},0)/keep.length : m0;
+    var sd = keep.length>1 ? Math.sqrt(keep.reduce(function(a,b){return a+(b-m)*(b-m);},0)/(keep.length-1)) : 0;
+    return { m0:m0, m:m, sd:sd, cv: m? sd/m*100 : 0, keep:keep, out:out };
+  }
+  function paint(){
+    var st = stats();
+    $('b_serie').innerHTML = S.map(function(v,i){
+      var bad = st && st.out.indexOf(v) >= 0;
+      return '<span class="'+(bad?'out':'')+'">'+nf(v,1)+'<b data-i="'+i+'">✕</b></span>'; }).join('');
+    Array.prototype.forEach.call($('b_serie').querySelectorAll('b'), function(b){
+      b.onclick = function(){ S.splice(+b.dataset.i,1); paint(); };
+    });
+    if (!st){ $('b_out').innerHTML = ''; return; }
+    var vals = { val: st.m.toFixed(1), cls: $('b_cls').value };
+    var r = PPO.evalMeas('beton', vals, ctxOfPick('b_pole'));
+    outBox($('b_out'), r, 'beton', vals, 'b_pole');
+    $('b_out').insertAdjacentHTML('afterbegin','<div class="res"><table>' +
+      '<tr><td>Отсчётов в серии</td><td>'+S.length+'</td></tr>' +
+      '<tr><td>Отбраковано (отклонение свыше 10 %)</td><td>'+st.out.length+'</td></tr>' +
+      '<tr><td>Среднее по принятым</td><td>'+nf(st.m,1)+' МПа</td></tr>' +
+      '<tr><td>Стандартное отклонение</td><td>'+nf(st.sd,2)+' МПа</td></tr>' +
+      '<tr><td>Коэффициент вариации</td><td>'+nf(st.cv,1)+' %</td></tr></table>' +
+      (S.length < 6 ? '<p class="mini" style="margin:8px 0 0;color:var(--warn)">По ГОСТ 22690-2015 на участке нужно не менее 6 отсчётов.</p>' : '') +
+      '</div>');
+  }
+  $('b_add').onclick = function(){
+    var v = parseFloat($('b_in').value);
+    if (!(v>0)){ toast('Введите число', true); return; }
+    S.push(v); $('b_in').value=''; $('b_in').focus(); paint();
+  };
+  $('b_in').onkeydown = function(e){ if (e.key==='Enter') $('b_add').click(); };
+  $('b_clr').onclick = function(){ S = []; paint(); };
+  $('b_cls').oninput = paint;
+  paint();
+})();
+
+/* ================================================== 5. ТРЕЩИНОМЕР */
+(function(){
+  var W = [0.05,0.1,0.15,0.2,0.3,0.4,0.5];
+  function px(){ return parseFloat($('c_cal').value); }   // пикселей на 1 мм
+  function paint(){
+    $('c_card').style.width = (85.6*px()) + 'px';
+    $('c_lines').innerHTML = W.map(function(w){
+      return '<div><i style="width:'+Math.max(1, w*px())+'px"></i>' +
+             '<span>'+nf(w,2)+' мм</span>' +
+             '<button class="btn ghost sm" data-w="'+w+'">Это она</button></div>'; }).join('');
+    Array.prototype.forEach.call($('c_lines').querySelectorAll('[data-w]'), function(b){
+      b.onclick = function(){ $('c_val').value = b.dataset.w; recalc(); };
+    });
+  }
+  function recalc(){
+    var vals = { val:$('c_val').value, ref:$('c_ref').value };
+    outBox($('c_out'), PPO.evalMeas('crack', vals, ctxOfPick('c_pole')), 'crack', vals, 'c_pole');
+  }
+  $('c_cal').oninput = paint;
+  $('c_val').oninput = $('c_ref').oninput = recalc;
+  paint();
+})();
+
+/* ================================================== 6. ЗАЗЕМЛЕНИЕ */
+(function(){
+  function recalc(){
+    var vals = { val:$('z_val').value, ro:$('z_ro').value };
+    outBox($('z_out'), PPO.evalMeas('zazem', vals, ctxOfPick('z_pole')), 'zazem', vals, 'z_pole');
+  }
+  $('z_val').oninput = $('z_ro').oninput = recalc;
+})();
+
+/* ============================================== 7. ПРОЛЁТЫ ПО GPS */
+(function(){
+  var here = null;
+  function opts(){
+    var o = '<option value="">— выберите —</option>';
+    if (here) o += '<option value="here">Текущая позиция</option>';
+    return o + D.poles.filter(function(p){ return p.lat && p.lon; }).map(function(p){
+      return '<option value="'+esc(p.id)+'">№ '+esc(p.num)+(p.line?' · '+esc(p.line):'')+'</option>'; }).join('');
+  }
+  function fill(){ $('d_a').innerHTML = opts(); $('d_b').innerHTML = opts(); }
+  function pt(id){
+    var v = $(id).value;
+    if (v==='here') return here;
+    var p = D.poles.filter(function(x){return x.id===v;})[0];
+    return p && p.lat ? { lat:+String(p.lat).replace(',','.'), lon:+String(p.lon).replace(',','.') } : null;
+  }
+  function calc(){
+    var a = pt('d_a'), b = pt('d_b');
+    if (!a || !b){ $('d_out').innerHTML=''; return; }
+    var m = PPO.haversine(a.lat, a.lon, b.lat, b.lon);
+    $('d_out').innerHTML = '<div class="bigread"><div class="v">'+nf(m,1)+'</div><div class="u">метров между точками</div>' +
+      '<small>' + nf(m/1000,3) + ' км по прямой (без учёта рельефа)</small></div>';
+  }
+  $('d_a').onchange = $('d_b').onchange = calc;
+  $('d_here').onclick = function(){
+    if (!navigator.geolocation){ toast('Геолокация недоступна', true); return; }
+    navigator.geolocation.getCurrentPosition(function(p){
+      here = { lat:p.coords.latitude, lon:p.coords.longitude };
+      fill(); $('d_a').value='here'; calc();
+      toast('Позиция получена, точность ±'+Math.round(p.coords.accuracy)+' м');
+    }, function(){ toast('Не удалось получить позицию', true); }, { enableHighAccuracy:true, timeout:12000 });
+  };
+  $('d_fill').onclick = function(){
+    /* группируем по линии: опоры одной линии могут идти в списке не подряд */
+    var groups = {}, order = [];
+    D.poles.forEach(function(p){
+      var k = p.line || '';
+      if (!groups[k]){ groups[k] = []; order.push(k); }
+      groups[k].push(p);
+    });
+    var n = 0, noGeo = 0, jumps = [], ends = 0;
+    order.forEach(function(k){
+      var g = groups[k];
+      for (var i=0;i<g.length;i++){
+        var a = g[i], b = g[i+1];
+        if (!b){ ends++; continue; }
+        if (!a.lat || !a.lon || !b.lat || !b.lon){ noGeo++; continue; }
+        var m = PPO.haversine(+String(a.lat).replace(',','.'), +String(a.lon).replace(',','.'),
+                              +String(b.lat).replace(',','.'), +String(b.lon).replace(',','.'));
+        if (m > 600){ jumps.push('№ '+a.num+' → № '+b.num+' ('+Math.round(m)+' м)'); continue; }
+        a.span = Math.round(m); n++;
+      }
+    });
+    PPO.save();
+    $('d_fillout').innerHTML = '<div class="note '+(n?'ok':'warn')+'" style="margin-bottom:0"><b>' +
+      (n ? 'Записано пролётов: '+n : 'Записать не удалось') + '</b>' +
+      'У последних опор каждой линии пролёта нет — таких ' + ends + '.' +
+      (noGeo ? '<br>Пропущено пар без координат: ' + noGeo + '.' : '') +
+      (jumps.length ? '<br>Похоже на разрыв трассы, пролёт не записан: ' + jumps.join(', ') +
+        '. Проверьте порядок опор или впишите пролёт вручную.' : '') +
+      '</div>';
+    if (n) toast('Пролёты записаны: '+n);
+  };
+  fill();
+})();
+
+/* ============================================ 8. КОМПОНОВКА ОКСН */
+(function(){
+  var KINDS = ['gz_oksn','d_oksn_prov','d_oksn_elem','d_vert','d_horiz'];
+  $('x_fields').innerHTML = KINDS.map(function(k){
+    var m = PPO.measById(k);
+    return '<div class="field"><label>'+esc(m.name)+'</label>' +
+           '<input type="number" step="0.01" data-x="'+k+'"><div class="hint">'+esc(m.norm(null, C))+'</div></div>';
+  }).join('');
+  function recalc(){
+    var rows = [];
+    Array.prototype.forEach.call($('x_fields').querySelectorAll('[data-x]'), function(el){
+      if (!el.value) return;
+      var r = PPO.evalMeas(el.dataset.x, { val:el.value }, ctxOfPick('x_pole'));
+      if (r) rows.push(r);
+    });
+    if (!rows.length){ $('x_out').innerHTML = ''; return; }
+    var bad = rows.filter(function(r){ return r.verdict.indexOf('не соответствует')===0; }).length;
+    $('x_out').innerHTML = '<div class="tblwrap" style="margin-top:12px"><table class="tbl">' +
+      '<tr><th>Расстояние</th><th>Замер</th><th>Вывод</th></tr>' +
+      rows.map(function(r){
+        var b = r.verdict.indexOf('не соответствует')===0;
+        return '<tr><td>'+esc(r.name)+'<div class="mini">'+esc(r.norm)+'</div></td>' +
+               '<td><b>'+esc(r.value)+'</b> '+esc(r.unit)+'</td>' +
+               '<td><span class="tag '+(b?'bad':'ok')+'">'+esc(r.verdict)+'</span></td></tr>'; }).join('') +
+      '</table></div>' +
+      '<div class="note '+(bad?'bad':'ok')+'"><b>' +
+        (bad ? 'Не соответствует нормативу: '+bad+' из '+rows.length : 'Все замеры в норме') + '</b>' +
+        (bad ? 'Несоответствия попадут в мероприятия отчёта.' : 'Компоновка на опоре допустима.') + '</div>' +
+      '<div class="btnrow"><button class="btn" id="x_save">Записать все в измерения</button></div>';
+    $('x_save').onclick = function(){
+      Array.prototype.forEach.call($('x_fields').querySelectorAll('[data-x]'), function(el){
+        if (el.value) put(el.dataset.x, { val:el.value }, 'x_pole');
+      });
+    };
+  }
+  Array.prototype.forEach.call($('x_fields').querySelectorAll('[data-x]'), function(el){ el.oninput = recalc; });
+})();
+
+/* ======================================== 9. НЕСУЩАЯ СПОСОБНОСТЬ */
+(function(){
+  var ICE = { 'I':10,'II':15,'III':20,'IV':25,'V':30,'VI':35,'VII':40 };
+  var WIND = { 'I':400,'II':500,'III':650,'IV':800,'V':1000,'VI':1250,'VII':1500 };
+  $('n_w').innerHTML = Object.keys(WIND).map(function(k){
+    return '<option value="'+k+'"'+(k==='II'?' selected':'')+'>'+k+' — '+WIND[k]+' Па</option>'; }).join('');
+  $('n_i').innerHTML = Object.keys(ICE).map(function(k){
+    return '<option value="'+k+'"'+(k==='II'?' selected':'')+'>'+k+' — '+ICE[k]+' мм</option>'; }).join('');
+  var marks = C.kv ? PPO.polesByKv(C.kv) : PPO.POLES;
+  $('n_mark').innerHTML = marks.map(function(p){ return '<option>'+esc(p.mark)+'</option>'; }).join('');
+  $('n_cab').innerHTML = '<option value="">— без нового кабеля —</option>' +
+    PPO.CABLES.map(function(c){
+      var sel = D.cables[0] && D.cables[0].mark===c.mark ? ' selected' : '';
+      return '<option'+sel+'>'+esc(c.mark)+'</option>'; }).join('');
+
+  function alphaW(w){
+    var t=[[200,1],[240,.94],[280,.88],[300,.85],[320,.83],[360,.80],[400,.76],[500,.71],[580,.70]];
+    if (w<=200) return 1; if (w>=580) return .70;
+    for (var i=1;i<t.length;i++) if (w<=t[i][0])
+      return t[i-1][1] + (t[i][1]-t[i-1][1])*(w-t[i-1][0])/(t[i][0]-t[i-1][0]);
+    return .70;
+  }
+  function klSpan(L){
+    var t=[[50,1.2],[100,1.1],[150,1.05],[250,1.0]];
+    if (!L||L<=50) return 1.2; if (L>=250) return 1.0;
+    for (var i=1;i<t.length;i++) if (L<=t[i][0])
+      return t[i-1][1] + (t[i][1]-t[i-1][1])*(L-t[i-1][0])/(t[i][0]-t[i-1][0]);
+    return 1.0;
+  }
+  function loads(d, mass, cl){
+    var g=9.81, q=(mass||0)/1000*g, be=cl.be;
+    var pIce = Math.PI*be*((d||0)+be)*0.9*g*1e-3;
+    var cx = (d||0)>=20 ? 1.1 : 1.2;
+    return { q:q, pIce:pIce,
+      wNo: cl.kw*cx*cl.w0*((d||0)*1e-3),
+      wIce: cl.kw*1.2*cl.wg*(((d||0)+2*be)*1e-3) };
+  }
+  function calc(){
+    var ref = PPO.poleByMark($('n_mark').value); if (!ref){ $('n_out').innerHTML=''; return; }
+    var L = parseFloat($('n_l').value)||50;
+    var w0 = WIND[$('n_w').value], be = ICE[$('n_i').value], kw = parseFloat($('n_t').value);
+    var wg = Math.max(Math.round(0.25*w0), (parseFloat(String(C.kv).replace(',','.'))<=20 ? 200 : 0));
+    var cl = { be:be, w0:w0, wg:wg, kw:kw, gfIce: be>=20 ? 1.6 : 1.3 };
+    var aw = alphaW(w0), kl = klSpan(L), GF_W = 1.3, GF_G = 1.05;
+
+    function contrib(d, mass, n, h){
+      var Lo = loads(d, mass, cl);
+      var H = Math.max(aw*kl*Lo.wIce*L*n*GF_W, aw*kl*Lo.wNo*L*n*GF_W);
+      var V = (Lo.q*GF_G + Lo.pIce*cl.gfIce)*L*n;
+      return { M: H*h/1000, V: V/1000 };
+    }
+    var Mex = 0, Vex = 0;
+    D.wires.forEach(function(w){
+      var r = PPO.wireByMark(w.mark) || PPO.cableByMark(w.mark); if (!r) return;
+      var c = contrib(r.d, r.m, +w.n||1, parseFloat(w.h)||ref.h);
+      Mex += c.M; Vex += c.V;
+    });
+    var Mnew = 0, cab = PPO.cableByMark($('n_cab').value);
+    if (cab){ var cc = contrib(cab.d, cab.m, 1, ref.h - 1); Mnew = cc.M; }
+    var Mt = Mex + Mnew, res = ref.m_adm ? (ref.m_adm - Mt)/ref.m_adm*100 : null;
+    var cls = res === null ? '' : (res < 0 ? 'bad' : (res < 10 ? '' : 'ok'));
+    $('n_out').innerHTML = '<div class="bigread '+cls+'"><div class="v">' +
+      (res===null?'—':nf(res,1)+' %') + '</div><div class="u">запас по изгибающему моменту</div>' +
+      '<small>' + (res===null ? 'нет данных о допустимом моменте' :
+        (res < 0 ? 'расчётный момент превышает допустимый' :
+         res < 10 ? 'запас менее 10 % — нужен поверочный расчёт в проекте' :
+         'запас достаточный для предварительной оценки')) + '</small></div>' +
+      '<div class="res"><table>' +
+      '<tr><td>Допустимый момент в заделке ('+esc(ref.mark)+')</td><td>'+nf(ref.m_adm,1)+' кН·м</td></tr>' +
+      '<tr><td>От существующей подвески ('+D.wires.length+' поз.)</td><td>'+nf(Mex,2)+' кН·м</td></tr>' +
+      '<tr><td>От нового кабеля'+(cab?' ('+esc(cab.mark)+')':'')+'</td><td>'+nf(Mnew,2)+' кН·м</td></tr>' +
+      '<tr><td>Итого расчётный момент</td><td>'+nf(Mt,2)+' кН·м</td></tr>' +
+      '<tr><td>Вертикальная нагрузка от подвески</td><td>'+nf(Vex,2)+' кН</td></tr>' +
+      '</table><p class="mini" style="margin:8px 0 0">Гололёд по п. 2.5.53, ветер по п. 2.5.52, ' +
+      'коэффициенты надёжности первой группы по пп. 2.5.55, 2.5.62, 2.5.69 ПУЭ-7. ' +
+      'Собственный вес опоры, оттяжки и работа фундамента не учитываются.</p></div>';
+  }
+  ['n_mark','n_l','n_w','n_i','n_t','n_cab'].forEach(function(id){ $(id).onchange = $(id).oninput = calc; });
+  calc();
+})();
+
+/* ============================================ 10. ЁМКОСТЬ ОПОРЫ */
+(function(){
+  function calc(){
+    var hp = parseFloat($('q_hp').value), n = parseInt($('q_n').value,10)||0,
+        g = parseFloat($('q_g').value)||5;
+    if (!(hp>0)){ $('q_out').innerHTML=''; return; }
+    var r = PPO.vlByKv(C.kv);
+    var d = r ? r.d_oksn_prov : 0.6;
+    var top = hp - d;                 // верхняя допустимая отметка крепления ОК
+    var free = top - g;               // свободная по высоте зона
+    var can = free > 0 ? Math.floor(free/0.30) + 1 : 0;
+    var left = Math.max(0, can - n);
+    $('q_out').innerHTML = '<div class="bigread '+(left?'ok':'bad')+'"><div class="v">'+left+'</div>' +
+      '<div class="u">кабелей можно разместить дополнительно</div>' +
+      '<small>всего мест по высоте: '+can+', занято: '+n+'</small></div>' +
+      '<div class="res"><table>' +
+      '<tr><td>Нижняя точка крепления провода ВЛ</td><td>'+nf(hp,2)+' м</td></tr>' +
+      '<tr><td>Отступ ОКСН от провода (класс '+esc(C.kv||'—')+' кВ)</td><td>'+nf(d,2)+' м</td></tr>' +
+      '<tr><td>Верхняя отметка крепления ОК</td><td>'+nf(top,2)+' м</td></tr>' +
+      '<tr><td>Нижняя отметка (габарит до земли)</td><td>'+nf(g,2)+' м</td></tr>' +
+      '<tr><td>Шаг между точками крепления</td><td>0,30 м</td></tr>' +
+      '</table><p class="mini" style="margin:8px 0 0">Оценка по вертикальному шагу 0,30 м (ТТ № 282р п. 3.2.6). ' +
+      'Фактическая ёмкость определяется проектом с учётом стрелы провеса, арматуры и охранных требований.</p></div>';
+  }
+  ['q_hp','q_n','q_g'].forEach(function(id){ $(id).oninput = calc; });
+})();
+</script>
+</body>
+</html>

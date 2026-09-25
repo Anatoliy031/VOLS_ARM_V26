@@ -1,0 +1,3231 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Генератор отчёта по п. 13 Правил (ПП РФ № 2106)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="ppo-xlsx.js?v=3.6.3"></script>
+<script src="ppo-core.js?v=3.6.3"></script>
+<script src="ppo-refs.js?v=3.6.3"></script>
+<script src="ppo-geo.js?v=3.6.3"></script>
+<script src="ppo-audit.js?v=3.6.3"></script>
+<style>
+:root{
+  --ink:#0F1E2E; --blue:#005B9C; --blue-2:#2E7FBF; --blue-pale:#E7EFF7;
+  --rail:#EDF1F5; --paper:#FFFFFF; --line:#C9D3DD; --line-soft:#DFE6ED;
+  --muted:#5C6B7A; --ok:#0F7B6C; --warn:#B26A00; --bad:#A32B2B;
+  --ui: ui-sans-serif, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --doc: "Times New Roman", Times, serif;
+  --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --rail-w: 344px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--ui); color:var(--ink); background:var(--rail);
+  font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit}
+
+/* ================= RAIL ================= */
+.rail{
+  position:fixed; inset:0 auto 0 0; width:var(--rail-w);
+  background:var(--rail); border-right:1px solid var(--line);
+  display:flex; flex-direction:column; overflow-y:auto;
+}
+.rail-head{padding:20px 20px 16px; border-bottom:1px solid var(--line)}
+.mark{
+  font-family:var(--mono); font-size:10px; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--blue); margin-bottom:8px;
+}
+.rail-head h1{
+  font-size:17px; line-height:1.25; margin:0 0 6px; font-weight:650; letter-spacing:-.01em;
+}
+.rail-head p{margin:0; font-size:12px; color:var(--muted); line-height:1.45}
+
+/* сигнатурная полоса п.13 а–д */
+.p13{padding:16px 20px; border-bottom:1px solid var(--line)}
+.p13-label{
+  font-family:var(--mono); font-size:10px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--muted); margin-bottom:9px;
+}
+.p13-strip{display:grid; grid-template-columns:repeat(5,1fr); gap:3px}
+.seg{
+  height:38px; border:1px solid var(--line); background:#fff; border-radius:2px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:1px; transition:background .25s, border-color .25s, color .25s;
+}
+.seg b{font-size:13px; font-weight:650; line-height:1}
+.seg span{font-family:var(--mono); font-size:8px; letter-spacing:.05em; color:var(--muted)}
+.seg.on{background:var(--blue); border-color:var(--blue); color:#fff}
+.seg.on span{color:#BFD8EC}
+
+.block{padding:16px 20px; border-bottom:1px solid var(--line)}
+.block h2{
+  font-family:var(--mono); font-size:10px; letter-spacing:.11em; text-transform:uppercase;
+  color:var(--muted); margin:0 0 10px; font-weight:600;
+}
+.btn{
+  display:block; width:100%; padding:10px 12px; margin-bottom:7px;
+  border:1px solid var(--blue); background:var(--blue); color:#fff;
+  border-radius:3px; font-size:13px; font-weight:550; cursor:pointer; text-align:left;
+  transition:background .15s;
+}
+.btn:hover{background:#00497D}
+.btn.ghost{background:#fff; color:var(--blue)}
+.btn.ghost:hover{background:var(--blue-pale)}
+.stale-bar{flex:1 1 100%; margin-top:10px; padding:11px 14px; border-radius:10px;
+  background:#FDF4E3; border:1px solid #E8CD93; border-left:4px solid #B26A00;
+  font-size:13px; line-height:1.45; color:#5A4310}
+.stale-bar b{display:block; margin-bottom:3px}
+.stale-bar .btn{margin-top:8px}
+@media print{ .stale-bar{display:none !important} }
+.btn.plain{background:#fff; color:var(--ink); border-color:var(--line)}
+.btn.plain:hover{background:#F6F9FC}
+.btn:focus-visible{outline:2px solid var(--blue-2); outline-offset:2px}
+.btn[disabled]{opacity:.45; cursor:not-allowed}
+.hint{font-size:11.5px; color:var(--muted); margin:6px 0 0; line-height:1.45}
+.hint a{color:var(--blue)}
+input[type=file]{display:none}
+
+.stats{display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:4px}
+.stat{background:#fff; border:1px solid var(--line-soft); border-radius:3px; padding:8px 10px}
+.stat b{display:block; font-family:var(--mono); font-size:18px; line-height:1.1; font-weight:600}
+.stat span{font-size:10.5px; color:var(--muted); display:block; margin-top:2px}
+.stat.ok b{color:var(--ok)} .stat.warn b{color:var(--warn)} .stat.bad b{color:var(--bad)}
+
+.audit-sum{
+  font-size:12px; font-weight:600; padding:7px 10px; border-radius:3px; margin-bottom:8px;
+  background:#fff; border:1px solid var(--line-soft); color:var(--muted);
+}
+.audit-sum.ok{color:var(--ok); border-color:#BFE0DA}
+.audit-sum.warn{color:var(--warn); border-color:#EAD3A8}
+.audit-sum.fail{color:var(--bad); border-color:#E4BEBE}
+.alist{display:flex; flex-direction:column; gap:2px; max-height:210px; overflow-y:auto}
+.arow{display:flex; gap:7px; align-items:baseline; font-size:11.5px; line-height:1.35; padding:2px 4px; border-radius:2px}
+.arow b{font-family:var(--mono); width:12px; flex:none}
+.arow.ok b{color:var(--ok)} .arow.warn b{color:var(--warn)} .arow.fail b{color:var(--bad)}
+.arow.warn{background:#FDF6E9} .arow.fail{background:#FBEFEF}
+.log{
+  font-size:11.5px; line-height:1.6; color:var(--muted);
+  background:#fff; border:1px solid var(--line-soft); border-radius:3px; padding:9px 11px;
+  max-height:180px; overflow-y:auto;
+}
+.log .e{color:var(--bad)} .log .w{color:var(--warn)} .log .s{color:var(--ok)}
+
+.thumbs{display:flex; flex-wrap:wrap; gap:5px; margin-top:8px}
+.thumbs img{width:52px; height:40px; object-fit:cover; border:1px solid var(--line); border-radius:2px}
+
+/* ================= CANVAS ================= */
+.canvas{margin-left:var(--rail-w); padding:34px 34px 90px; display:flex; justify-content:center}
+.paper{
+  width:210mm; min-height:297mm; background:var(--paper); padding:20mm 15mm 20mm 25mm;
+  box-shadow:0 1px 3px rgba(15,30,46,.10), 0 10px 34px rgba(15,30,46,.09);
+  font-family:var(--doc); font-size:12pt; line-height:1.42; color:#000;
+}
+.paper h1{
+  font-size:13.5pt; margin:20pt 0 10pt; font-weight:bold; color:#0F1E2E;
+  border-bottom:2.25pt solid #005B9C; padding-bottom:3pt; letter-spacing:.01em;
+}
+.paper h2{font-size:12.5pt; margin:14pt 0 7pt; font-weight:bold; color:#0F1E2E}
+.paper h1:first-child{margin-top:0}
+/* фирменный бланк титула */
+.letterhead{text-align:center; text-indent:0; margin:0 0 2pt; line-height:1.35}
+.letterhead .lh-full{font-size:11pt; letter-spacing:.04em}
+.letterhead .lh-branch{font-size:12.5pt; font-weight:bold; letter-spacing:.02em; margin-top:2pt}
+.letterhead .lh-sub{font-size:9.5pt; color:#333; margin-top:2pt}
+.lh-rule{border:none; border-top:2.5pt solid #005B9C; margin:6pt 0 1.5pt}
+.lh-rule2{border:none; border-top:.75pt solid #005B9C; margin:0 0 14pt}
+/* колонтитулы при печати */
+.run-head,.run-foot{
+  display:none; position:fixed; left:0; right:0; z-index:4;
+  font-family:"Times New Roman",serif; font-size:8.5pt; color:#33404D;
+}
+.run-head{top:0; border-bottom:.75pt solid #005B9C; padding:2mm 15mm 1.2mm 25mm;
+  display:none; justify-content:space-between}
+.run-foot{bottom:0; border-top:.75pt solid #005B9C; padding:1.2mm 15mm 2mm 25mm;
+  text-align:center}
+.paper p{margin:0 0 7pt; text-align:justify; text-indent:1.25cm}
+.paper p.ni{text-indent:0}
+.paper p.c{text-align:center; text-indent:0}
+.paper p.r{text-align:right; text-indent:0}
+.paper ul{margin:0 0 7pt; padding-left:1.1cm}
+.paper li{margin-bottom:3pt; text-align:justify}
+.paper small{font-size:10pt; color:#333}
+.title-main{font-size:18pt; font-weight:bold; text-align:center; text-indent:0; margin:0 0 8pt}
+.spacer{height:22mm}
+
+table.t{width:100%; border-collapse:collapse; margin:4pt 0 10pt; font-size:9.5pt; table-layout:fixed; line-height:1.3}
+table.t th,table.t td{border:.75pt solid #6B7480; padding:3.5pt 5pt; vertical-align:top; word-wrap:break-word; overflow-wrap:break-word; hyphens:auto}
+table.t th{background:#005B9C; color:#fff; font-weight:bold; text-align:center; font-size:9pt; border-color:#004B82;
+  -webkit-print-color-adjust:exact; print-color-adjust:exact}
+table.t td.n{text-align:center; white-space:nowrap}
+table.t tbody tr:nth-child(even) td{background:#F4F7FA}
+table.t tbody tr{break-inside:avoid; page-break-inside:avoid}
+table.t.kv td:first-child{width:36%; background:#F4F7FA; font-weight:600}
+table.t.kv tbody tr:nth-child(even) td{background:transparent}
+table.t.kv tbody tr:nth-child(even) td:first-child{background:#F4F7FA}
+table.t.wide{font-size:8.5pt}
+table.t.wide th{font-size:8pt}
+table.t td:empty::after{content:'—'; color:#98A3AE}
+.sec-note{font-style:italic; font-size:10.5pt; color:#333; text-indent:0; margin:0 0 8pt}
+
+.fill{color:var(--blue)}
+.edit{
+  border-bottom:1px dashed var(--blue-2); outline:none; display:block; padding:1pt 0;
+}
+.edit:hover{background:#F2F8FD}
+.edit:focus{background:#EAF3FB; border-bottom-style:solid}
+
+.fig{text-align:center; text-indent:0; margin:8pt 0}
+.fig img{max-width:100%; border:1px solid #999}
+.fig-cap{text-align:center; text-indent:0; font-size:10.5pt; margin:4pt 0 12pt}
+.pb{break-before:page; page-break-before:always}
+
+.empty-note{
+  border:1px dashed var(--line); border-radius:3px; padding:14px 16px;
+  font-family:var(--ui); font-size:12px; color:var(--muted); text-indent:0; margin:8pt 0;
+}
+
+.wm-layer{
+  display:none; position:fixed; inset:0; z-index:5; pointer-events:none;
+  align-items:center; justify-content:center;
+  font-family:var(--ui); font-size:44pt; font-weight:700; color:#005B9C;
+  opacity:.08; transform:rotate(-32deg); text-align:center; line-height:1.3;
+  white-space:pre-wrap; padding:0 6%;
+}
+body.wm .wm-layer{display:flex}
+
+/* ================= PRINT ================= */
+@media print{
+  .rail{display:none}
+  .wm-layer{position:fixed}
+  .run-head{display:flex} .run-foot{display:block}
+  table.t th{background:#005B9C !important; color:#fff !important}
+  .paper h1{border-bottom-color:#005B9C !important}
+  *{-webkit-print-color-adjust:exact; print-color-adjust:exact}
+  .canvas{margin:0; padding:0; display:block}
+  .paper{width:auto; min-height:0; box-shadow:none; padding:0}
+  .edit{border-bottom:none; background:none !important}
+  .empty-note{border-color:#999}
+  @page{size:A4; margin:24mm 15mm 22mm 25mm}
+}
+@media (max-width:1100px){
+  :root{--rail-w:300px}
+  .paper{width:100%; padding:16mm 10mm}
+}
+@media (max-width:820px){
+  .rail{position:static; width:auto; height:auto; border-right:none; border-bottom:1px solid var(--line)}
+  .canvas{margin:0; padding:16px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none !important}}
+
+/* ---- полоса навигации рабочего места ---- */
+.ppobar{position:fixed;top:0;left:0;right:0;height:44px;z-index:90;
+  background:linear-gradient(135deg,#005B9C,#003E6B);color:#fff;
+  display:flex;align-items:center;gap:12px;padding:0 14px;font-size:13px}
+.ppobar .m{width:28px;height:28px;border-radius:8px;background:#fff;color:#005B9C;
+  display:grid;place-items:center;font-weight:800;font-size:10.5px;flex:0 0 auto}
+.ppobar b{font-size:13.5px;font-weight:700}
+.ppobar nav{margin-left:auto;display:flex;gap:4px;overflow-x:auto}
+.ppobar nav a{color:#fff;text-decoration:none;font-size:12.5px;font-weight:600;padding:5px 11px;
+  border-radius:999px;background:rgba(255,255,255,.13);white-space:nowrap}
+.ppobar nav a.on{background:#fff;color:#003E6B}
+.rail{top:44px !important}
+.canvas{padding-top:78px !important}
+@media print{ .ppobar{display:none} .rail{top:0 !important} .canvas{padding-top:0 !important} }
+@media (max-width:900px){ .ppobar b{display:none} }
+</style>
+</head>
+<body>
+
+<div class="ppobar">
+  <div class="m">ППО</div><b>Генератор отчёта</b>
+  <nav id="ppoNav"></nav>
+</div>
+
+<aside class="rail">
+  <div class="rail-head">
+    <div class="mark">ПП РФ № 2106 · п. 13</div>
+    <h1>Отчёт по результатам осмотра объекта инфраструктуры</h1>
+    <p>Загрузите заполненный файл исходных данных — отчёт соберётся автоматически.</p>
+  </div>
+
+  <div class="p13">
+    <div class="p13-label">Покрытие подпунктов п. 13</div>
+    <div class="p13-strip">
+      <div class="seg" id="sgA"><b>а</b><span>СХЕМЫ</span></div>
+      <div class="seg" id="sgB"><b>б</b><span>ВОЗМ.</span></div>
+      <div class="seg" id="sgC"><b>в</b><span>МЕРОПР.</span></div>
+      <div class="seg" id="sgD"><b>г</b><span>ЦЕНА</span></div>
+      <div class="seg" id="sgE"><b>д</b><span>ДОСТУП</span></div>
+    </div>
+  </div>
+
+  <div class="block">
+    <h2>Исходные данные</h2>
+    <button class="btn" id="btnFromOsmotr" type="button">Взять данные из осмотра</button>
+    <button class="btn ghost" id="btnDiag" type="button">Диагностика</button>
+    <label class="btn ghost" for="fXls">Загрузить файл исходных данных (.xlsx)</label>
+    <input type="file" id="fXls" accept=".xlsx,.xlsm">
+    <a class="btn ghost" href="ID_shablon.xlsx" download style="text-decoration:none">Скачать пустой шаблон</a>
+    <p class="hint">Проще всего — заполнить данные в разделе «Осмотр» и нажать кнопку сверху.
+       Файл .xlsx нужен, когда данные собирал кто-то другой.</p>
+    <a class="btn ghost" href="obyazatelstvo.html" style="text-decoration:none">Форма обязательства (п. 15 Правил)</a>
+    <p class="hint">Сведения по пункту 13 передаются только после письменного обязательства пользователя
+       инфраструктуры о конфиденциальности. Бланк заполняется реквизитами осмотра.</p>
+  </div>
+
+  <div class="block">
+    <h2>Графические материалы</h2>
+    <label class="btn plain" for="fScheme">Схема размещения → приложение А</label>
+    <input type="file" id="fScheme" accept="image/jpeg,image/png,.pdf" multiple>
+    <button class="btn plain" type="button" id="btnPhotosDefect">Фото дефектных опор → приложение В</button>
+    <button class="btn plain" type="button" id="btnPhotosAll">Все фото из осмотра → приложение В</button>
+    <label class="btn plain" for="fPhotos">Фотоматериалы с диска → приложение В</label>
+    <input type="file" id="fPhotos" accept="image/jpeg,image/png,.pdf" multiple>
+    <p class="hint">Изображения и документы ПДФ; можно выбрать несколько файлов сразу. Страницы ПДФ преобразуются в изображения.</p>
+    <div class="thumbs" id="thumbs"></div>
+  </div>
+
+  <div class="block" id="statsBlock" style="display:none">
+    <h2>Сводка по опорам</h2>
+    <div class="stats">
+      <div class="stat"><b id="stTotal">0</b><span>всего опор</span></div>
+      <div class="stat ok"><b id="stYes">0</b><span>возможность есть</span></div>
+      <div class="stat warn"><b id="stCond">0</b><span>при условии</span></div>
+      <div class="stat bad"><b id="stNo">0</b><span>отсутствует</span></div>
+    </div>
+  </div>
+
+  <div class="block">
+    <h2>Внутренний аудит</h2>
+    <div class="audit-sum" id="auditSum">Файл не загружен</div>
+    <div class="alist" id="auditList"></div>
+    <p class="hint">Полная таблица проверок — «Лист внутреннего контроля качества» в конце отчёта.</p>
+  </div>
+
+  <div class="block">
+    <h2>Выгрузка</h2>
+    <button class="btn" id="btnPrint">Сохранить в ПДФ (печать)</button>
+    <button class="btn" id="btnPrintWm">ПДФ с водяным знаком</button>
+    <button class="btn ghost" id="btnWord">Выгрузить в Ворд (.docx)</button>
+    <button class="btn ghost" id="btnRebuild" title="Собрать отчёт заново по текущим данным раздела «Осмотр»">Пересобрать отчёт по новым данным</button>
+    <div id="staleBar" class="stale-bar" style="display:none">
+      <b>Отчёт собран по прежним данным осмотра.</b>
+      Данные изменились после сборки — лист внутреннего контроля показывает устаревшие замечания.
+      <button class="btn plain" type="button" id="btnStale">Пересобрать по текущим данным</button>
+    </div>
+    <p class="hint">Поля с пунктирным подчёркиванием редактируются прямо в документе — правки попадут в выгрузку.</p>
+  </div>
+
+  <div class="block">
+    <h2>Протокол загрузки</h2>
+    <div class="log" id="log">Файл не загружен. Отображается пустая эталонная форма.</div>
+  </div>
+</aside>
+
+<div class="wm-layer" id="wmLayer" aria-hidden="true">Филиал ПАО «Россети Юг» — «Кубаньэнерго»</div>
+<div class="run-head" aria-hidden="true"><span>Филиал ПАО «Россети Юг» — «Кубаньэнерго»</span><span id="rhNo"></span></div>
+<div class="run-foot" aria-hidden="true"><span id="rfTxt">Отчёт по пункту 13 Правил (ПП РФ № 2106)</span></div>
+<main class="canvas"><div class="paper" id="doc"></div></main>
+
+<script>
+"use strict";
+
+/* ============================================================ СОСТОЯНИЕ */
+const S = { pass:{}, poles:[], meas:[], si:[], acts:[], loadPoles:[], loadWires:[], cables:[], schemes:[], photos:[] };
+
+const PH = "____________________";
+/* Последний результат внутреннего контроля. Нужен шлюзу выпуска: кнопки
+   печати и выгрузки обращаются к нему, чтобы не пересчитывать отчёт заново. */
+/* объявление через var — чтобы результат контроля был виден извне
+   (диагностика, автотесты), как и функции страницы */
+var LAST_AUDIT = [];
+/* Отметка времени объекта, по которому собран отчёт. Отчёт строится по снимку
+   данных осмотра, а не по самим данным: пока снимок не обновлён, лист
+   внутреннего контроля показывает несоответствия, устранённые в «Осмотре».
+   Именно поэтому повторная выгрузка выдавала прежние замечания. */
+var SRC_STAMP = null;
+function srcStale(){
+  if (SRC_STAMP === null || typeof PPO === 'undefined') return false;
+  try { return String(PPO.load().saved || '') !== String(SRC_STAMP); }
+  catch (e) { return false; }
+}
+function markSrc(){
+  try { SRC_STAMP = (typeof PPO !== 'undefined') ? String(PPO.load().saved || '') : null; }
+  catch (e) { SRC_STAMP = null; }
+  paintStale();
+}
+/* Пересобрать отчёт по текущим данным осмотра. Значениями, без шаблона:
+   на разметку отчёта шаблон не влияет, а ждать его загрузки перед выгрузкой
+   незачем. */
+function refreshFromOsmotr(){
+  if (typeof PPO === 'undefined') return false;
+  try {
+    parseWorkbook(PPO.buildWorkbook());
+    render();
+    markSrc();
+    return true;
+  } catch (e){
+    log('Не удалось обновить отчёт по данным осмотра: ' + (e && e.message ? e.message : e), 'e');
+    return false;
+  }
+}
+function paintStale(){
+  var b = document.getElementById('staleBar');
+  if (!b) return;
+  if (!srcStale()){ b.style.display = 'none'; return; }
+  b.style.display = '';
+}
+const logEl = document.getElementById('log');
+function log(msg, cls){
+  const d = document.createElement('div');
+  if (cls) d.className = cls;
+  d.textContent = msg;
+  logEl.appendChild(d);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function clearLog(){ logEl.innerHTML = ''; }
+
+/* ============================================================ УТИЛИТЫ */
+function esc(v){
+  if (v === null || v === undefined) return '';
+  return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+// значение из паспорта; если пусто — синий плейсхолдер
+function F(code, suffix){
+  const v = S.pass[code];
+  if (v === undefined || v === null || String(v).trim() === '')
+    return '<span class="fill">' + PH + '</span>';
+  return esc(v) + (suffix || '');
+}
+function raw(code){
+  const v = S.pass[code];
+  return (v === undefined || v === null) ? '' : String(v).trim();
+}
+function num(v){
+  if (v === null || v === undefined || v === '') return NaN;
+  const n = parseFloat(String(v).replace(/\s/g,'').replace(',', '.'));
+  return isNaN(n) ? NaN : n;
+}
+function norm(v){ return String(v === undefined || v === null ? '' : v).trim().toLowerCase(); }
+/* Категория дефекта в справочнике — ЛАТИНСКАЯ «A». Из Excel, KMZ и от руки
+   приходит кириллическая «А». Без приведения счётчик категории А всегда даёт
+   ноль, а проверка аудита «категория А ↔ вывод есть» никогда не срабатывает. */
+function NC(v){
+  let t = String(v === undefined || v === null ? '' : v).trim().toUpperCase();
+  if (t === '\u0410') t = 'A';
+  if (t === 'B') t = '\u0412';   // латинская «B» — это кириллическая «В»
+  if (t === '' || t === '-' || t === '\u2013') t = '—';
+  return t;
+}
+/* «не соответствует» (раздел Г.1) и «недостаточно» (раздел Г.2) — одно и то же
+   основание для мероприятия. */
+function isBad(v){
+  const t = norm(v);
+  return t.indexOf('не соответ') === 0 || t.indexOf('недостаточ') === 0;
+}
+function protoOf(r){
+  const p = String(r['Раздел протокола'] || '').trim();
+  if (p) return p;
+  return /свободн/i.test(String(r['Вид измерения'] || '')) ? 'Г.2 — достаточность интервалов'
+                                                           : 'Г.1 — фактическое состояние';
+}
+function isG2(r){ return protoOf(r).indexOf('Г.2') === 0; }
+// согласование числительных
+function plural(n, one, few, many){
+  const a = Math.abs(n) % 100, b = a % 10;
+  if (a > 10 && a < 20) return many;
+  if (b > 1 && b < 5) return few;
+  if (b === 1) return one;
+  return many;
+}
+
+// Excel-дата или строка → Date
+function toDate(v){
+  if (v instanceof Date) return v;
+  if (typeof v === 'number' && v > 20000 && v < 80000){
+    return new Date(Date.UTC(1899,11,30 + Math.floor(v)));
+  }
+  const s = String(v || '').trim();
+  let m = s.match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/);
+  if (m) return new Date(+m[3], +m[2]-1, +m[1]);
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return new Date(+m[1], +m[2]-1, +m[3]);
+  return null;
+}
+function fmtDate(d){
+  if (!d) return '';
+  const p = n => String(n).padStart(2,'0');
+  return p(d.getDate()) + '.' + p(d.getMonth()+1) + '.' + d.getFullYear();
+}
+// нерабочие: суббота, воскресенье и нерабочие праздничные дни (ст. 112 ТК РФ), без учёта переносов
+const HOLIDAYS = ['01-01','01-02','01-03','01-04','01-05','01-06','01-07','01-08','02-23','03-08','05-01','05-09','06-12','11-04'];
+function isWorkday(d){
+  const w = d.getDay();
+  if (w === 0 || w === 6) return false;
+  const key = String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  return HOLIDAYS.indexOf(key) === -1;
+}
+function addWorkdays(start, n){
+  if (!start) return null;
+  const d = new Date(start.getTime());
+  let left = n;
+  while (left > 0){ d.setDate(d.getDate()+1); if (isWorkday(d)) left--; }
+  return d;
+}
+
+/* ============================================================ РАЗБОР КНИГИ */
+function readSheet(wb, name){
+  const ws = wb.Sheets[name];
+  if (!ws) return null;
+  return XLSX.utils.sheet_to_json(ws, { defval:'', raw:true });
+}
+function findSheet(wb, want){
+  const w = want.toLowerCase();
+  return wb.SheetNames.find(n => n.trim().toLowerCase() === w) ||
+         wb.SheetNames.find(n => n.trim().toLowerCase().indexOf(w) === 0) || null;
+}
+function isExampleRow(row){
+  return String(row['Служебная отметка'] || '').trim().toUpperCase() === 'ПРИМЕР';
+}
+
+function parseWorkbook(wb){
+  clearLog();
+  S.pass = {}; S.poles = []; S.meas = []; S.si = []; S.acts = []; S.lines = [];
+
+  // --- Паспорт: пары Код / Значение
+  const nPass = findSheet(wb, 'паспорт');
+  if (nPass){
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[nPass], { header:1, defval:'' });
+    let n = 0;
+    rows.forEach(r => {
+      const code = String(r[0] || '').trim();
+      if (!code || code === 'Код' || code.indexOf('__') === 0) return;
+      if (!/^[А-ЯЁA-Z][А-ЯЁA-Z0-9_]+$/.test(code)) return;
+      const val = r[2];
+      const d = (code.indexOf('ДАТА') >= 0) ? toDate(val) : null;
+      S.pass[code] = d ? fmtDate(d) : (val === '' ? '' : val);
+      if (String(S.pass[code]).trim() !== '') n++;
+    });
+    log('Паспорт: заполнено полей — ' + n, 's');
+  } else log('Лист «Паспорт» не найден.', 'e');
+  autoClimate();
+  autoVL();
+
+  // --- Линии (пообъектная идентификация ВЛ)
+  const nLn = findSheet(wb, 'линии');
+  if (nLn){
+    S.lines = (readSheet(wb, nLn) || []).filter(r => !isExampleRow(r) &&
+      String(r['Линия / фидер'] || '').trim() !== '');
+    log('Линии: описано — ' + S.lines.length, S.lines.length ? 's' : 'w');
+  }
+
+  // --- Опоры
+  const nPol = findSheet(wb, 'опоры');
+  if (nPol){
+    const rows = readSheet(wb, nPol) || [];
+    S.poles = rows.filter(r => {
+      if (isExampleRow(r)) return false;
+      return String(r['№ опоры'] || '').trim() !== '' || String(r['№ п/п'] || '').trim() !== '';
+    });
+    S.poles.forEach(r => { r['Категория дефекта'] = NC(r['Категория дефекта']); });
+    log('Опоры: строк — ' + S.poles.length, S.poles.length ? 's' : 'w');
+    const bad = S.poles.filter(r => norm(r['Технологическая возможность']) === '');
+    /* предупреждение выдаётся после достройки по справочникам — см. backfill() */
+  } else log('Лист «Опоры» не найден.', 'e');
+
+  // --- Измерения
+  const nMe = findSheet(wb, 'измерения');
+  if (nMe){
+    S.meas = (readSheet(wb, nMe) || []).filter(r => !isExampleRow(r) && String(r['Вид измерения'] || '').trim() !== '');
+    log('Измерения: строк — ' + S.meas.length, S.meas.length ? 's' : 'w');
+  }
+
+  // --- СИ
+  const nSi = findSheet(wb, 'си');
+  if (nSi){
+    S.si = (readSheet(wb, nSi) || []).filter(r => !isExampleRow(r) && String(r['Наименование средства измерения'] || '').trim() !== '');
+    S.si.forEach(r => {
+      ['Дата поверки','Поверка действительна до'].forEach(k => {
+        const d = toDate(r[k]); if (d) r[k] = fmtDate(d);
+      });
+    });
+    log('Средства измерений: строк — ' + S.si.length, S.si.length ? 's' : 'w');
+    const noFgis = S.si.filter(r => String(r['№ записи о поверке во ФГИС «Аршин»'] || '').trim() === '');
+    if (noFgis.length) log('Не указана запись во ФГИС «Аршин» у ' + noFgis.length + ' СИ.', 'w');
+  }
+
+  // --- Кабели (размещаемые элементы сети электросвязи)
+  S.cables = [];
+  const nCb = findSheet(wb, 'кабели');
+  if (nCb){
+    S.cables = (readSheet(wb, nCb) || []).filter(r => !isExampleRow(r) &&
+      String(r['Марка (из «Спр_Кабели»)'] || '').trim() !== '');
+    log('Кабели: типов размещаемых элементов — ' + S.cables.length, S.cables.length ? 's' : 'w');
+    const noD = S.cables.filter(r => !String(r['Наружный диаметр, мм'] || '').toString().trim());
+    /* предупреждение выдаётся после достройки по справочникам — см. backfill() */
+  } else log('Лист «Кабели» не найден.', 'e');
+
+  // --- Нагрузки (два блока на одном листе)
+  S.loadPoles = []; S.loadWires = [];
+  const nLd = findSheet(wb, 'нагрузки');
+  if (nLd){
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[nLd], { header:1, defval:'' });
+    let mode = null, hdr = null;
+    rows.forEach(r => {
+      const first = String(r[0] || '').trim();
+      if (/^БЛОК\s*1/i.test(first)){ mode = 1; hdr = null; return; }
+      if (/^БЛОК\s*2/i.test(first)){ mode = 2; hdr = null; return; }
+      if (!mode) return;
+      if (!hdr){
+        if (/^Марка опоры/.test(first) || /^Марка провода/.test(first))
+          hdr = r.map(x => String(x).trim()
+            .replace(/^Марка провода \/ кабеля.*/, 'Марка провода / кабеля')
+            .replace(/^Примечание.*/, 'Примечание'));
+        return;
+      }
+      if (!first) return;
+      const o = {}; hdr.forEach((h, i) => { if (h) o[h] = r[i]; });
+      if (String(o['Служебная отметка'] || '').trim().toUpperCase() === 'ПРИМЕР') return;
+      if (mode === 1) S.loadPoles.push(o); else S.loadWires.push(o);
+    });
+    /* итог по «Нагрузкам» выводится после достройки — см. backfill() */
+  } else log('Лист «Нагрузки» не найден — приложение Ж не будет рассчитано.', 'w');
+
+  // --- Мероприятия
+  const nAc = findSheet(wb, 'мероприятия');
+  if (nAc){
+    S.acts = (readSheet(wb, nAc) || []).filter(r => !isExampleRow(r) && String(r['Мероприятие'] || '').trim() !== '');
+    S.acts.forEach(r => { const d = toDate(r['Срок выполнения']); if (d) r['Срок выполнения'] = fmtDate(d); });
+    log('Мероприятия: строк — ' + S.acts.length, S.acts.length ? 's' : 'w');
+  }
+
+  backfill();
+}
+
+/* ====================================================== ДОСТРОЙКА ДАННЫХ
+   Столбцы шаблона, которые в Excel считаются формулами, при чтении книги
+   в браузере оказываются пустыми: формулы вычисляет только сам Excel при
+   открытии файла. Здесь они восстанавливаются по справочникам — так отчёт
+   собирается одинаково и из книги осмотра, и из шаблона, скачанного на диск,
+   и из шаблона, в котором формулы кто-то стёр вручную. */
+function backfill(){
+  if (typeof PPO === 'undefined') return;
+  let nPole = 0, nCab = 0, nLoad = 0, nAct = 0;
+
+  const put = (row, key, val) => {
+    if (val === undefined || val === '' || val === null) return false;
+    if (String(row[key] || '').trim() !== '') return false;
+    row[key] = val; return true;
+  };
+
+  // --- Опоры: материал, тип, дефект, состояние, возможность, мероприятие
+  S.poles.forEach(r => {
+    let touched = false;
+    const ref = PPO.poleByMark(String(r['Марка опоры'] || '').trim());
+    if (ref){
+      touched = put(r, 'Материал', ref.mat) || touched;
+      touched = put(r, 'Тип по назначению', ref.type) || touched;
+    }
+    const cat = NC(r['Категория дефекта']);
+    r['Категория дефекта'] = cat;
+    const df = PPO.defectByCat(cat);
+    if (df){
+      touched = put(r, 'Дефект', df.txt) || touched;
+      touched = put(r, 'Состояние конструкции (ГОСТ 31937-2024)', df.state) || touched;
+      touched = put(r, 'Технологическая возможность', df.tv) || touched;
+      touched = put(r, 'Мероприятие', df.act) || touched;
+      if (!String(r['Примечание'] || '').trim() && df.note) r['Примечание'] = df.note;
+    }
+    if (touched) nPole++;
+  });
+
+  // --- Кабели: характеристики по марке
+  S.cables.forEach(r => {
+    const ref = PPO.cableByMark(String(r['Марка (из «Спр_Кабели»)'] || r['Марка'] || '').trim());
+    if (!ref) return;
+    let t = false;
+    t = put(r, 'Тип элемента', ref.type) || t;
+    t = put(r, 'Наружный диаметр, мм', ref.d) || t;
+    t = put(r, 'Погонная масса, кг/км', ref.m) || t;
+    t = put(r, 'Допустимое тяжение, кН', ref.t) || t;
+    t = put(r, 'Область применения (кВ)', ref.area) || t;
+    if (t) nCab++;
+  });
+
+  // --- Нагрузки, блок 2: диаметр и масса по марке
+  S.loadWires.forEach(r => {
+    const mk = String(r['Марка провода / кабеля'] || '').trim();
+    const ref = PPO.wireByMark(mk) || PPO.cableByMark(mk);
+    if (!ref) return;
+    put(r, 'Наружный диаметр, мм', ref.d);
+    put(r, 'Погонная масса, кг/км', ref.m);
+  });
+
+  // --- Нагрузки, блок 1: собрать по листу «Опоры», если пусто
+  if (!S.loadPoles.length && S.poles.length){
+    attachSpans(S.poles);
+    const byMark = {};
+    S.poles.forEach(p => {
+      const mk = String(p['Марка опоры'] || '').trim();
+      if (!mk) return;
+      if (!byMark[mk]) byMark[mk] = { n:0, sp:0, spn:0, mx:0, over:0, lim:0, ang:0,
+                                      lw:0, lwAt:'', lwLim:0, lwLimAt:'' };
+      const b = byMark[mk];
+      b.n++;
+      const sp = parseFloat(p['Пролёт до следующей опоры, м']);
+      if (sp > 0){ b.sp += sp; b.spn++; if (sp > b.mx) b.mx = sp; }
+      /* Расчётный (ветровой) пролёт опоры — полусумма смежных пролётов,
+         у концевой опоры цепи — половина единственного смежного. Именно
+         он входит в изгибающий момент; наибольший из смежных завышает
+         нагрузку почти вдвое и даёт заведомо недостоверный дефицит. */
+      const lw = parseFloat(p.__lw);
+      if (lw > b.lw){ b.lw = lw; b.lwAt = String(p['№ опоры'] || ''); }
+      const rf = PPO.poleByMark(mk);
+      if (rf && rf.lgab && sp > rf.lgab) b.over++;
+      /* пролёт для варианта с понижающим коэффициентом берётся по фактически
+         дефектным опорам, а не по наибольшему пролёту марки: комбинация
+         «дефект + чужой пролёт» в натуре не существует и запутывает вывод */
+      if (NC(p['Категория дефекта']) === 'Б'){
+        b.lim++;
+        if (lw > b.lwLim){ b.lwLim = lw; b.lwLimAt = String(p['№ опоры'] || ''); }
+      }
+      const ag = parseFloat(p['Угол поворота, град']); if (ag > b.ang) b.ang = ag;
+    });
+    Object.keys(byMark).forEach(mk => {
+      const ref = PPO.poleByMark(mk) || {};
+      const b = byMark[mk];
+      const avg = b.spn ? Math.round(b.sp / b.spn) : 50;
+      // расчётный пролёт — наибольший ветровой в пределах марки
+      const calc = b.lw || b.mx || avg;
+      S.loadPoles.push({
+        'Марка опоры': mk,
+        'Типовой проект / паспорт': ref.proj_full || ref.proj || '',
+        'Высота подвеса проводов, м': ref.h || '',
+        'Допустимый изгибающий момент стойки, кН·м': ref.m_adm || '',
+        'Расчётный весовой пролёт, м': calc,
+        'Расчётный ветровой пролёт, м': calc,
+        'Кол-во опор данной марки': b.n,
+        'Стойка': ref.st || '',
+        'Схема (учёт тяжения)': ref.sch || '',
+        'Габаритный пролёт, м': ref.lgab || '',
+        'Опор с пролётом свыше габаритного, шт': b.over,
+        'Опор в ограниченно работоспособном состоянии, шт': b.lim,
+        'Средний пролёт, м (справочно)': avg,
+        'Расчётный пролёт дефектных опор, м': b.lwLim || '',
+        'Опора расчётного пролёта': b.lwAt || '',
+        'Опора расчётного пролёта (дефектная)': b.lwLimAt || '',
+        'Наибольший угол поворота, град': b.ang || '',
+        'Класс напряжения, кВ': ref.kv || ''
+      });
+      nLoad++;
+    });
+  }
+
+  // --- Мероприятия: собрать из несоответствий и дефектов, если пусто
+  if (!S.acts.length){
+    let n = 0;
+    const done = {};
+    const G1 = 'Е.2 — эксплуатация (владелец)', G2 = 'Е.1 — обусловлено размещением (пользователь)';
+    const push = o => { o['№ п/п'] = ++n; S.acts.push(o); nAct++; };
+
+    /* Е.2 — дефекты конструкций. Возникли до заявки, размещением не вызваны:
+       содержание объекта — обязанность собственника (ст. 210 ГК РФ, ПТЭ).
+       Возложение их устранения на заявителя как условия доступа — состав
+       по ч. 1 ст. 10 Федерального закона № 135-ФЗ. */
+    S.poles.forEach(p => {
+      const act = String(p['Мероприятие'] || '').trim();
+      if (!act) return;
+      const key = (p['Линия / фидер'] || '') + '|' + (p['№ опоры'] || '');
+      if (done[key]) return; done[key] = 1;
+      push({ 'Группа': G1, 'Линия / фидер': p['Линия / фидер'] || '',
+        '№ опоры': p['№ опоры'] || '', 'Мероприятие': act,
+        'Основание (дефект, несоответствие)': p['Дефект'] || '',
+        'Исполнитель': 'Владелец инфраструктуры', 'Срок выполнения': '' });
+    });
+    /* Е.2 — несоответствия фактического состояния (протокол Г.1) */
+    S.meas.forEach(m => {
+      if (!isBad(m['Вывод']) || isG2(m)) return;
+      const key = (m['Линия / фидер'] || '') + '|' + (m['№ опоры'] || '');
+      if (done[key]) return; done[key] = 1;   // мероприятие по этой опоре уже есть
+      push({ 'Группа': G1, 'Линия / фидер': m['Линия / фидер'] || '',
+        '№ опоры': m['№ опоры'] || '',
+        'Мероприятие': 'Устранение несоответствия фактического состояния конструкции',
+        'Основание (дефект, несоответствие)': (m['Вид измерения'] || '') + ': ' +
+          (m['Значение'] || '') + ' ' + (m['Ед. изм.'] || '') + ' при норме — ' + (m['Нормативное требование'] || ''),
+        'Исполнитель': 'Владелец инфраструктуры', 'Срок выполнения': '' });
+    });
+    /* Е.1 — недостаточность свободных интервалов (протокол Г.2): обусловлено размещением */
+    S.meas.forEach(m => {
+      if (!isBad(m['Вывод']) || !isG2(m)) return;
+      push({ 'Группа': G2, 'Линия / фидер': m['Линия / фидер'] || '',
+        '№ опоры': m['№ опоры'] || '',
+        'Мероприятие': 'Проектное решение по размещению ОК с обеспечением нормируемого расстояния',
+        'Основание (дефект, несоответствие)': (m['Вид измерения'] || '') + ': ' +
+          (m['Значение'] || '') + ' ' + (m['Ед. изм.'] || '') + ' при норме — ' + (m['Нормативное требование'] || ''),
+        'Исполнитель': 'Пользователь инфраструктуры', 'Срок выполнения': '' });
+    });
+    /* Е.1 — поверочный расчёт там, где количественная оценка не выдана */
+    const noQ = {};
+    S.poles.forEach(p => {
+      const rf = PPO.poleByMark(String(p['Марка опоры'] || '').trim());
+      if (!rf || !PPO.poleTensioned(rf.sch)) return;
+      noQ[rf.mark] = (noQ[rf.mark] || 0) + 1;
+    });
+    Object.keys(noQ).forEach(mk => {
+      push({ 'Группа': G2, 'Линия / фидер': '—', '№ опоры': 'опор данной марки: ' + noQ[mk],
+        'Мероприятие': 'Поверочный расчёт несущей способности опор марки ' + mk +
+          ' по расчётной схеме, с учётом момента от тяжения, подкосов и оттяжек (в составе проектной документации)',
+        'Основание (дефект, несоответствие)': 'Опоры, воспринимающие неуравновешенное тяжение: упрощённая сопоставительная оценка к ним неприменима (пункт 6 ТТ № 282р)',
+        'Исполнитель': 'Пользователь инфраструктуры', 'Срок выполнения': '' });
+    });
+    /* Е.1 — пролёты свыше габаритного */
+    S.poles.forEach(p => {
+      const rf = PPO.poleByMark(String(p['Марка опоры'] || '').trim());
+      const sp = parseFloat(p['Пролёт до следующей опоры, м']);
+      if (!rf || !rf.lgab || !(sp > rf.lgab)) return;
+      push({ 'Группа': G2, 'Линия / фидер': p['Линия / фидер'] || '', '№ опоры': p['№ опоры'] || '',
+        'Мероприятие': 'Поверочный расчёт пролёта, превышающего габаритный (в составе проектной документации)',
+        'Основание (дефект, несоответствие)': 'Фактический пролёт ' + sp + ' м при габаритном ' +
+          rf.lgab + ' м для марки ' + rf.mark,
+        'Исполнитель': 'Пользователь инфраструктуры', 'Срок выполнения': '' });
+    });
+  }
+
+  /* итоги и предупреждения — уже по достроенным данным */
+  log('Нагрузки: типов опор — ' + S.loadPoles.length + ', позиций подвески — ' + S.loadWires.length,
+      S.loadPoles.length ? 's' : 'w');
+  const noTv = S.poles.filter(r => String(r['Технологическая возможность'] || '').trim() === '');
+  if (noTv.length) log('Не определена «Технологическая возможность» у ' + noTv.length +
+    ' опор — проверьте категорию дефекта.', 'w');
+  const noD = S.cables.filter(r => !parseFloat(r['Наружный диаметр, мм']));
+  if (noD.length) log('Не заполнены характеристики у ' + noD.length +
+    ' кабелей — проверьте марку в справочнике.', 'w');
+  if (!S.acts.length) log('Мероприятий нет — несоответствий и дефектов не выявлено.', 's');
+
+  const parts = [];
+  if (nPole) parts.push('опор — ' + nPole);
+  if (nCab) parts.push('кабелей — ' + nCab);
+  if (nLoad) parts.push('типов опор в «Нагрузках» — ' + nLoad);
+  if (nAct) parts.push('мероприятий — ' + nAct);
+  if (parts.length)
+    log('Достроено по справочникам: ' + parts.join(', ') + '. Формулы шаблона вычисляет Excel, ' +
+        'поэтому производные столбцы восстановлены здесь.', 's');
+}
+
+/* ============================================================ ВЫЧИСЛЕНИЯ */
+/* Доступ к графам листа «Опоры» для расчёта цепочки пролётов.
+   Одна и та же функция ядра обслуживает и внутренние объекты опор
+   (осмотр), и строки книги (отчёт) — иначе цифры разойдутся. */
+const POLE_GET = {
+  line: r => r['Линия / фидер'],
+  num:  r => r['№ опоры'],
+  lat:  r => r['Широта'],
+  lon:  r => r['Долгота'],
+  span: r => r['Пролёт до следующей опоры, м'],
+  mark: r => r['Марка опоры'],
+  /* Признак конца участка приходит из служебной графы книги. Без него отчёт
+     достроил бы цепь через концевую опору и посчитал бы расчётный пролёт по
+     несуществующему звену. */
+  endPole: r => /конечн/i.test(String(r['Служебная отметка'] || '')) ? 1 : 0,
+  /* Ручная привязка соседей приходит из той же служебной графы. Без неё отчёт
+     не увидел бы звено, продолжающееся на другой линии или в другом классе
+     напряжения, и посчитал бы опору концом участка. */
+  prevRef: r => (String(r['Служебная отметка'] || '').match(/ПРЕД=([^;]*)/i) || ['',''])[1].trim(),
+  nextRef: r => (String(r['Служебная отметка'] || '').match(/СЛЕД=([^;]*)/i) || ['',''])[1].trim()
+};
+/* Подвешивает на каждую строку смежные опоры и расчётный пролёт.
+   Считается один раз за сборку отчёта и переиспользуется всеми разделами. */
+function attachSpans(rows){
+  const chain = PPO.chainSpans(rows, POLE_GET);
+  rows.forEach(r => {
+    const rec = chain.byItem.get(r);
+    r.__prevNum = rec ? rec.prevNum : '';
+    r.__nextNum = rec ? rec.nextNum : '';
+    r.__lPrev   = rec && rec.lPrev !== null ? rec.lPrev : '';
+    r.__lNext   = rec && rec.lNext !== null ? rec.lNext : '';
+    r.__lw      = rec && rec.lw    !== null ? rec.lw    : '';
+    r.__ends    = rec ? rec.ends : true;
+    r.__endPole = rec ? !!rec.endPole : false;
+    r.__spur    = rec ? rec.spur : false;
+    r.__nSpans  = (r.__lPrev !== '' ? 1 : 0) + (r.__lNext !== '' ? 1 : 0);
+  });
+  return chain;
+}
+
+function derive(){
+  const P = S.poles;
+  attachSpans(P);
+  const d = { total:P.length };
+
+  const stateOf = r => norm(r['Состояние конструкции (ГОСТ 31937-2024)']);
+  d.cntOk  = P.filter(r => /норматив|работоспособ/.test(stateOf(r)) && !/огранич|аварий/.test(stateOf(r))).length;
+  d.cntLim = P.filter(r => /огранич/.test(stateOf(r))).length;
+  d.cntBad = P.filter(r => /аварий/.test(stateOf(r))).length;
+
+  const tvOf = r => norm(r['Технологическая возможность']);
+  d.tvYes  = P.filter(r => tvOf(r) === 'есть').length;
+  d.tvCond = P.filter(r => /при услов/.test(tvOf(r))).length;
+  d.tvNo   = P.filter(r => /отсутств/.test(tvOf(r))).length;
+  const pct = n => d.total ? (Math.round(n / d.total * 1000) / 10).toString().replace('.', ',') : '0';
+  d.pYes = pct(d.tvYes); d.pCond = pct(d.tvCond); d.pNo = pct(d.tvNo);
+
+  // типы опор
+  const types = {};
+  P.forEach(r => {
+    const k = String(r['Марка опоры'] || '').trim();
+    if (k) types[k] = (types[k] || 0) + 1;
+  });
+  d.poleTypes = Object.keys(types).map(k => k + ' — ' + types[k] + ' шт.').join('; ');
+
+  // протяжённость
+  /* Протяжённость — величина расчётная: сумма пролётов, а пролёты считаются по
+     координатам. Записанное в паспорте значение берётся только тогда, когда
+     считать не из чего: иначе в один документ попадали два разных числа об
+     одном и том же участке. */
+  let sum = 0, any = false;
+  P.forEach(r => { const s = num(r['Пролёт до следующей опоры, м']); if (!isNaN(s)){ sum += s; any = true; } });
+  let len = any ? Math.round(sum / 10) / 100 : num(raw('ОБЪЕКТ_ДЛИНА'));
+  d.length = isNaN(len) ? null : String(len).replace('.', ',');
+
+  // дефекты
+  /* Строка ведомости дефектов определяется КАТЕГОРИЕЙ, и только ею. Прежнее
+     условие «описание ИЛИ категория» подхватывало опоры, у которых категория
+     снята, а описание осталось от прежней правки, и печатало их с категорией
+     «—» и состоянием «Работоспособное» — дефект без дефекта. Категория же
+     определяет состояние конструкции, технологическую возможность и
+     мероприятие, поэтому она и есть единственный признак дефектной опоры. */
+  d.defects = P.filter(r => NC(r['Категория дефекта']) !== '—');
+
+  d.catA = d.defects.filter(r => NC(r['Категория дефекта']) === 'A').length;
+  d.catB = d.defects.filter(r => NC(r['Категория дефекта']) === 'Б').length;
+  d.catV = d.defects.filter(r => NC(r['Категория дефекта']) === 'В').length;
+
+  // измерения: раздельно по протоколам Г.1 и Г.2
+  d.measG1 = S.meas.filter(r => !isG2(r));
+  d.measG2 = S.meas.filter(r => isG2(r));
+  d.measBad = S.meas.filter(r => isBad(r['Вывод']));
+  d.measBadG1 = d.measG1.filter(r => isBad(r['Вывод']));
+  d.measBadG2 = d.measG2.filter(r => isBad(r['Вывод']));
+
+  // мероприятия по группам
+  d.actsE1 = S.acts.filter(r => String(r['Группа'] || '').indexOf('Е.1') === 0);
+  d.actsE2 = S.acts.filter(r => String(r['Группа'] || '').indexOf('Е.2') === 0);
+
+  // линии
+  d.lines = S.lines || [];
+
+  /* Контрольные сроки заказа. Считаются в ядре по правилам раздела 6
+     Регламента: рабочие дни, течение — со следующего рабочего дня,
+     приостановление по пункту 6.2.3 исключается из течения. */
+  d.dl = PPO.deadlines(S.pass || {});
+  const dl = d.dl.dogovor;
+  d.deadline = dl ? fmtDate(dl) : null;          /* договорный срок (п. 6.1.4) */
+  d.dlP16    = d.dl.p16    ? fmtDate(d.dl.p16)    : null;   /* п. 16 Правил */
+  d.dlPPO    = d.dl.regPPO ? fmtDate(d.dl.regPPO) : null;   /* п. 6.1.2 — 80 р.д. */
+  d.dlE6     = d.dl.reg6   ? fmtDate(d.dl.reg6)   : null;   /* п. 6.1.2 — 60 р.д. */
+
+  d.actsTotal = S.acts.length;
+  d.year = (toDate(raw('ОТЧЁТ_ДАТА')) || new Date()).getFullYear();
+  // нормируемый габарит проводов до земли: из паспорта (авто по классу/местности), фолбэк по местности
+  const nenas = /ненасел|труднодоступ/.test(norm(raw('МЕСТНОСТЬ')));
+  d.gabNorm = raw('ГАБАРИТ_ЗЕМЛЯ') || (nenas ? '6,0' : '7,0');
+  d.gabOksn = raw('ГАБАРИТ_ОКСН') || '5,0';
+  d.clrOksn = raw('РАССТ_ОКСН_ПРОВОД') || '';
+  d.gabNote = nenas ? 'ненаселённая (труднодоступная) местность' : 'населённая местность';
+  d.voltMax = raw('ОБЪЕКТ_КЛАСС_МАКС') || voltMax() || '';
+
+  /* Классы напряжения, фактически присутствующие на объекте: проставленные
+     в карточках опор ПЛЮС отмеченные в паспорте. Раньше учитывались только
+     опоры, и класс, отмеченный в паспорте, но не проставленный ни у одной
+     опоры, выпадал из таблицы 3.4. */
+  const kvSet = {};
+  P.forEach(r => { const k = String(r['Класс напряжения опоры'] || '').trim(); if (k) kvSet[k] = 1; });
+  String(raw('ОБЪЕКТ_КЛАСС') || '').split(';').forEach(k => { k = k.trim(); if (k) kvSet[k] = 1; });
+  d.kvList = Object.keys(kvSet).sort((a, b) => parseFloat(a.replace(',', '.')) - parseFloat(b.replace(',', '.')));
+  if (!d.kvList.length && d.voltMax) d.kvList = [d.voltMax];
+
+  /* характер местности по каждой опоре: населённая / ненаселённая */
+  d.mestMixed = (() => {
+    const m = {};
+    P.forEach(r => { const v = String(r['Характер местности'] || '').trim(); if (v) m[v] = 1; });
+    return Object.keys(m).length > 1;
+  })();
+
+  /* пролёты свыше габаритного */
+  d.overSpans = P.filter(r => {
+    const rf = PPO.poleByMark(String(r['Марка опоры'] || '').trim());
+    const sp = parseFloat(r['Пролёт до следующей опоры, м']);
+    return rf && rf.lgab && sp > rf.lgab;
+  });
+  return d;
+}
+/* известны ли монтажные тяжения всей существующей подвески */
+function tensionKnown(){
+  if (!S.loadWires.length) return false;
+  return S.loadWires.every(w => parseFloat(w['Монтажное тяжение, кН']) > 0);
+}
+/* нормируемый габарит провода до земли для конкретной опоры */
+function gabOf(row, d){
+  const kv = String(row['Класс напряжения опоры'] || '').trim() || d.voltMax;
+  const r = PPO.vlByKv(kv);
+  if (!r) return d.gabNorm;
+  const m = String(row['Характер местности'] || '').trim() || (d.gabNote.indexOf('ненасел') === 0 ? 'ненаселённая' : 'населённая');
+  return String(/ненасел|труднодост/.test(m.toLowerCase()) ? r.gz_nen : r.gz_nas).replace('.', ',');
+}
+
+/* ============================================================
+   РАСЧЁТ НАГРУЗОК ПО ПУЭ-7 (гл. 2.5) — сопоставительная оценка
+   Упрощения (консервативные, фиксируются в отчёте):
+   Ki=Kd=1 (высота подвеса < 25 м, d ~ 10 мм); Kw для типа местности
+   на высоте до 15 м; направление ветра 90° к оси ВЛ; момент в заделке
+   от горизонтальной нагрузки на высоте подвеса. */
+/* Автоопределение климатических районов по месту расположения.
+   Укрупнённое зонирование по зоне деятельности филиала (Краснодарский край,
+   Адыгея, КЧР): значения предварительные и подлежат подтверждению по
+   региональным картам климатического районирования ПУЭ-7. */
+const CLIMATE_ZONES = [
+  { kw:['сочи','туапс','лазаревск','адлер','красная поляна'], wind:'V', ice:'V', terrain:'А', seism:'8 (ОСР-2015-А)', note:'черноморская горная зона' },
+  { kw:['новоросси','геленджик','анапа','тамань','темрюк'], wind:'V', ice:'IV', terrain:'А', seism:'8 (ОСР-2015-А)', note:'черноморская прибрежная зона' },
+  { kw:['майкоп','апшеронск','мостовск','псебай','отрадн','лабинск','горяч','хадыж'], wind:'IV', ice:'V', terrain:'В', seism:'7 (ОСР-2015-А)', note:'предгорная зона' },
+  { kw:['карачаев','черкесск','зеленчук','теберд','домбай','кчр'], wind:'IV', ice:'V', terrain:'В', seism:'8 (ОСР-2015-А)', note:'горная зона КЧР' },
+  { kw:[], wind:'IV', ice:'IV', terrain:'В', seism:'7 (ОСР-2015-А)', note:'равнинная (степная) зона' }
+];
+/* Константы ПУЭ по классам напряжения (габариты, охранная зона) */
+const VL_CONST = {
+  '0.4':{gN:6.0,gU:6.0,ok:5.0,clr:0.4,gz:2},  '6':{gN:6.0,gU:6.0,ok:5.0,clr:0.6,gz:10},
+  '10':{gN:7.0,gU:6.0,ok:5.0,clr:0.6,gz:10},   '20':{gN:7.0,gU:6.0,ok:5.0,clr:0.6,gz:10},
+  '35':{gN:7.0,gU:6.0,ok:5.0,clr:0.6,gz:15},   '110':{gN:7.0,gU:6.0,ok:5.0,clr:1.0,gz:20},
+  '150':{gN:7.5,gU:6.5,ok:5.0,clr:1.5,gz:25},  '220':{gN:8.0,gU:7.0,ok:5.0,clr:2.0,gz:25},
+  '330':{gN:11.0,gU:7.5,ok:5.0,clr:2.5,gz:30}
+};
+function voltMax(){
+  const raw0 = raw('ОБЪЕКТ_КЛАСС');
+  if (!raw0) return null;
+  /* Разделитель перечня — «;». По запятой не режем: «0,4» — одно число, а не
+     «0» и «4»; иначе на объекте только 0,4 кВ наибольшим классом выходило «4»
+     и нормируемые габариты не подставлялись вовсе. */
+  const nums = String(raw0).split(';').map(x=>x.trim()).filter(Boolean)
+    .map(x=>x.replace(',', '.'));
+  // наибольший по числовому значению
+  let best=null, bestN=-1;
+  nums.forEach(x=>{ const n=parseFloat(x); if(!isNaN(n)&&n>bestN){bestN=n;best=x;} });
+  return best;
+}
+let CLIMATE_AUTO = false;
+function autoVL(){
+  const v = voltMax();
+  if (!v) return;
+  // ключ константы: 0.4 -> '0.4', 10 -> '10'
+  const key = (Math.abs(parseFloat(v)-0.4)<1e-6) ? '0.4' : String(Math.round(parseFloat(v)));
+  const c = VL_CONST[key]; if (!c) return;
+  const nenas = /ненасел|труднодоступ/.test(norm(raw('МЕСТНОСТЬ')));
+  const set=(code,val)=>{ if(!raw(code)) S.pass[code]=String(val).replace('.', ','); };
+  set('ОБЪЕКТ_КЛАСС_МАКС', v);
+  set('ГАБАРИТ_ЗЕМЛЯ', nenas ? c.gU : c.gN);
+  set('ГАБАРИТ_ОКСН', c.ok);
+  set('РАССТ_ОКСН_ПРОВОД', c.clr);
+  set('ОХРАННАЯ_ЗОНА', c.gz);
+}
+function autoClimate(){
+  CLIMATE_AUTO = false;
+  const region = norm(raw('ОБЪЕКТ_МЕСТО'));
+  if (!region) return;
+  const need = ['ВЕТЕР_РАЙОН','ВЕТЕР_ДАВЛЕНИЕ','ГОЛОЛЁД_РАЙОН','ГОЛОЛЁД_СТЕНКА','МЕСТНОСТЬ_ТИП','СЕЙСМИКА'];
+  if (need.every(c => raw(c))) return;   // всё задано вручную
+  let zone = CLIMATE_ZONES[CLIMATE_ZONES.length - 1];
+  for (const z of CLIMATE_ZONES){
+    if (z.kw.length && z.kw.some(k => region.indexOf(k) >= 0)){ zone = z; break; }
+  }
+  const set = (c, v) => { if (!raw(c)) S.pass[c] = v; };
+  set('ВЕТЕР_РАЙОН', zone.wind);
+  set('ВЕТЕР_ДАВЛЕНИЕ', String(WIND_PA[zone.wind]));
+  set('ГОЛОЛЁД_РАЙОН', zone.ice);
+  set('ГОЛОЛЁД_СТЕНКА', String(ICE_MM[zone.ice]));
+  set('МЕСТНОСТЬ_ТИП', zone.terrain);
+  set('СЕЙСМИКА', zone.seism);
+  CLIMATE_AUTO = true;
+  log('Климатические условия определены автоматически (' + zone.note + '): ветер ' + zone.wind +
+      ', гололёд ' + zone.ice + '. Подтвердите по региональным картам районирования.', 'w');
+}
+const ICE_MM = { 'I':10, 'II':15, 'III':20, 'IV':25, 'V':30, 'VI':35, 'VII':40 };
+const WIND_PA = { 'I':400, 'II':500, 'III':650, 'IV':800, 'V':1000, 'VI':1250, 'VII':1500 };
+const KW15 = { 'А':1.0, 'A':1.0, 'В':0.65, 'B':0.65, 'С':0.40, 'C':0.40 };
+
+function climat(){
+  const iceD = raw('ГОЛОЛЁД_РАЙОН').toUpperCase().replace(/[^IVX]/g,'');
+  const windD = raw('ВЕТЕР_РАЙОН').toUpperCase().replace(/[^IVX]/g,'');
+  let be = num(raw('ГОЛОЛЁД_СТЕНКА')); if (isNaN(be)) be = ICE_MM[iceD] || 25;
+  let w0 = num(raw('ВЕТЕР_ДАВЛЕНИЕ')); if (isNaN(w0)) w0 = WIND_PA[windD] || 800;
+  /* В поле хранится полная подпись типа местности («A — открытые побережья…»),
+     поэтому берём первую букву, а не всю строку: иначе поиск в таблице всегда
+     промахивался и молча срабатывал откат 0,65. Отчёт печатал «тип местности A»
+     и тут же «коэффициент 0,65», занижая ветровую нагрузку на 35 %. */
+  const terr = raw('МЕСТНОСТЬ_ТИП').trim().toUpperCase().replace(/^[^A-ZА-Я]*/, '').charAt(0);
+  const kwKnown = Object.prototype.hasOwnProperty.call(KW15, terr);
+  const kw = kwKnown ? KW15[terr] : 0.65;
+  let wg = Math.round(0.25 * w0);           // п. 2.5.43
+  const u = num(raw('ОБЪЕКТ_КЛАСС'));
+  if (!isNaN(u) && u <= 20 && wg < 200) wg = 200;
+  const gfIce = (ICE_MM[iceD] || be) >= 20 ? 1.6 : 1.3;   // п. 2.5.55: III и выше — 1.6
+  return { be, w0, wg, kw, gfIce, iceD, windD, terr, kwKnown };
+}
+function alphaW(w){ // п. 2.5.52
+  const t = [[200,1],[240,.94],[280,.88],[300,.85],[320,.83],[360,.80],[400,.76],[500,.71],[580,.70]];
+  if (w <= 200) return 1; if (w >= 580) return .70;
+  for (let i = 1; i < t.length; i++)
+    if (w <= t[i][0]){ const [x0,y0] = t[i-1], [x1,y1] = t[i];
+      return y0 + (y1-y0) * (w-x0) / (x1-x0); }
+  return .70;
+}
+function klSpan(L){ // п. 2.5.52
+  const t = [[50,1.2],[100,1.1],[150,1.05],[250,1.0]];
+  if (!L || L <= 50) return 1.2; if (L >= 250) return 1.0;
+  for (let i = 1; i < t.length; i++)
+    if (L <= t[i][0]){ const [x0,y0] = t[i-1], [x1,y1] = t[i];
+      return y0 + (y1-y0) * (L-x0) / (x1-x0); }
+  return 1.0;
+}
+// погонные нагрузки одного провода/кабеля, Н/м
+function lineLoads(d_mm, mass_kgkm, cl){
+  const g = 9.81;
+  const q = (num(mass_kgkm) || 0) / 1000 * g;                       // вес
+  const be = cl.be;
+  const pIce = Math.PI * be * ((num(d_mm) || 0) + be) * 0.9 * g * 1e-3;  // п. 2.5.53
+  const cx = (num(d_mm) || 0) >= 20 ? 1.1 : 1.2;
+  const wNoIce = cl.kw * cx * cl.w0 * ((num(d_mm) || 0) * 1e-3);     // ветер без гололёда
+  const wIce   = cl.kw * 1.2 * cl.wg * (((num(d_mm) || 0) + 2*be) * 1e-3); // ветер при гололёде
+  return { q, pIce, wNoIce, wIce };
+}
+// оценка по одному типу опоры; поз. подвески wires + новый кабель cab (или null)
+function assessPole(poleRow, wires, cab, cl, opt){
+  opt = opt || {};
+  const Lw = num(poleRow['Расчётный весовой пролёт, м']) || num(poleRow['Средний весовой пролёт, м']) || 50;
+  const Lv = num(poleRow['Расчётный ветровой пролёт, м']) || Lw;
+  const MadmRaw = num(poleRow['Допустимый изгибающий момент стойки, кН·м']) ||
+                  num(poleRow['Допустимый изгибающий момент в заделке, кН·м']);
+  const sch = String(poleRow['Схема (учёт тяжения)'] || '');
+  const angle = num(poleRow['Наибольший угол поворота, град']);
+  const kDef = (opt.kDef === undefined || opt.kDef === null) ? 1 : opt.kDef;
+  const Madm = (MadmRaw && !isNaN(MadmRaw)) ? MadmRaw * kDef : NaN;
+  const aw = alphaW(cl.w0), kl = klSpan(Lv);
+  const GF_W = 1.3, GF_G = 1.05, GF_I = cl.gfIce;  // I группа: 2.5.62, 2.5.69, 2.5.55/65
+
+  function contrib(item){
+    const n = num(item['Количество (шт. в подвесе)']) || 1;
+    const h = num(item['Высота подвеса, м']) || num(poleRow['Высота подвеса проводов, м']) || 8;
+    const L = lineLoads(item['Наружный диаметр, мм'], item['Погонная масса, кг/км'], cl);
+    const H_ice = aw * kl * L.wIce * Lv * n * GF_W;
+    const H_wnd = aw * kl * L.wNoIce * Lv * n * GF_W;
+    const H = Math.max(H_ice, H_wnd);                 // определяющий режим
+    const V = (L.q * GF_G + L.pIce * GF_I) * Lw * n;  // вертикальная с гололёдом
+    return { M: H * h / 1000, V: V / 1000, H: H / 1000 };
+  }
+  /* момент от тяжения: только для анкерных, угловых, концевых, ответвительных.
+     Доля неуравновешенного тяжения — по схеме опоры (PPO.tensionShare). */
+  function tension(item){
+    if (!PPO.poleTensioned(sch)) return 0;
+    const T = num(item['Монтажное тяжение, кН']);
+    if (!(T > 0)) return null;                        // тяжение неизвестно
+    const n = num(item['Количество (шт. в подвесе)']) || 1;
+    const h = num(item['Высота подвеса, м']) || num(poleRow['Высота подвеса проводов, м']) || 8;
+    return PPO.tensionShare(sch, angle) * T * n * h;  // кН·м
+  }
+
+  let Mex = 0, Vex = 0, Mt = 0, tUnknown = false;
+  wires.forEach(w => {
+    const c = contrib(w); Mex += c.M; Vex += c.V;
+    const t = tension(w);
+    if (t === null) tUnknown = true; else Mt += t;
+  });
+  let Mnew = 0, Vnew = 0;
+  (cab || []).forEach(cb => {
+    const c = contrib(cb); Mnew += c.M; Vnew += c.V;
+    const t = tension(cb);
+    if (t === null) tUnknown = true; else Mt += t;
+  });
+  const tensioned = PPO.poleTensioned(sch);
+  const Mtot = Mex + Mnew + Mt;
+  /* Количественный запас выдаётся ТОЛЬКО для промежуточных опор.
+     Анкерные, угловые, концевые и ответвительные опоры воспринимают
+     неуравновешенное тяжение и работают совместно с подкосами, оттяжками и
+     второй стойкой, которые упрощённая схема не описывает. Выдавать по ним
+     число — значит подписаться под расчётом, который не выполнялся: по таким
+     опорам оценка не приводится, а поверочный расчёт по расчётной схеме
+     переносится в проектную документацию (пункт 6 ТТ № 282р). */
+  const reserve = tensioned ? null
+                : ((Madm && !isNaN(Madm)) ? (Madm - Mtot) / Madm * 100 : null);
+  return {
+    mark: poleRow['Марка опоры'], proj: poleRow['Типовой проект / паспорт'],
+    st: poleRow['Стойка'] || '', sch: sch, kDef: kDef,
+    lgab: num(poleRow['Габаритный пролёт, м']),
+    over: num(poleRow['Опор с пролётом свыше габаритного, шт']) || 0,
+    lim: num(poleRow['Опор в ограниченно работоспособном состоянии, шт']) || 0,
+    lwAt: String(poleRow['Опора расчётного пролёта'] || ''),
+    lwAtLim: String(poleRow['Опора расчётного пролёта (дефектная)'] || ''),
+    MadmRaw, Madm, Mex, Mnew, Mt, Mtot, Vex, Vnew, reserve, Lw, Lv,
+    tensioned, tUnknown, note: opt.note || ''
+  };
+}
+function assessAll(){
+  if (!S.loadPoles.length) return null;
+  const cl = climat();
+  const cabs = S.cables.map(c => ({
+    'Марка провода / кабеля': c['Марка (из «Спр_Кабели»)'],
+    'Количество (шт. в подвесе)': 1,
+    'Наружный диаметр, мм': c['Наружный диаметр, мм'],
+    'Погонная масса, кг/км': c['Погонная масса, кг/км'],
+    'Высота подвеса, м': c['Высота подвеса, м'],
+    'Монтажное тяжение, кН': c['Монтажное тяжение, кН'] || c['Допустимое тяжение, кН'],
+    'Класс напряжения, кВ': c['Класс напряжения размещения, кВ'] || ''
+  })).filter(c => num(c['Наружный диаметр, мм']) > 0);
+  /* элемент относится к опоре, если его класс совпадает с классом опоры
+     либо задан как «все классы» / не задан */
+  /* Классы напряжения перечисляются через «;». Разбивать ещё и по запятой
+     нельзя: в «0,4» запятая десятичная, строка распадалась на «0» и «4», и
+     ВСЯ подвеска класса 0,4 кВ отсеивалась от опор 0,4 кВ — приложение Ж
+     показывало по ним нулевую нагрузку и запас 100 %. Сравниваем числами,
+     чтобы «0,4», «0.4» и «0,40» считались одним классом. */
+  const kvNum = v => {
+    const n = parseFloat(String(v).replace(',', '.').trim());
+    return isNaN(n) ? null : n;
+  };
+  const forKv = (list, kv) => list.filter(x => {
+    const k = String(x['Класс напряжения, кВ'] || x['Класс напряжения размещения, кВ'] || '').trim();
+    if (!k || /все\s*класс/i.test(k)) return true;
+    if (!kv) return true;
+    const want = kvNum(kv);
+    return k.split(';').some(z => {
+      const t = z.trim();
+      if (!t) return false;
+      if (t === String(kv).trim()) return true;
+      const a = kvNum(t);
+      return (a !== null && want !== null && Math.abs(a - want) < 1e-9);
+    });
+  });
+  const rows = [];
+  S.loadPoles.forEach(p => {
+    const kv = String(p['Класс напряжения, кВ'] || '').trim() ||
+               (PPO.poleByMark(String(p['Марка опоры'] || '').trim()) || {}).kv || '';
+    const w = forKv(S.loadWires, kv), c = forKv(cabs, kv);
+    p.__kv = kv; p.__w = w; p.__c = c;
+    rows.push(assessPole(p, w, c, cl));
+    /* для опор в ограниченно работоспособном состоянии — отдельная строка
+       с понижающим коэффициентом 0,8 к допустимому моменту: расчёт по
+       паспортному значению для дефектной конструкции недостоверен. */
+    const lim = num(p['Опор в ограниченно работоспособном состоянии, шт']) || 0;
+    if (lim > 0){
+      /* расчётный пролёт — по фактически дефектным опорам марки */
+      const spLim = num(p['Расчётный пролёт дефектных опор, м']);
+      const pd = spLim > 0 ? Object.assign({}, p, {
+        'Расчётный весовой пролёт, м': spLim,
+        'Расчётный ветровой пролёт, м': spLim
+      }) : p;
+      const r = assessPole(pd, p.__w, p.__c, cl,
+        { kDef: 0.8, note: 'в ограниченно работоспособном состоянии — ' + lim + ' шт.' +
+          (spLim > 0 ? '; расчёт по их фактическому пролёту ' + spLim + ' м' : '') });
+      r.derated = true;
+      rows.push(r);
+    }
+  });
+  return { cl, cab: cabs, rows, tKnown: tensionKnown(),
+    noQuant: rows.filter(r => r.tensioned),
+    worst: rows.reduce((m, r) => (r.reserve !== null && (m === null || r.reserve < m)) ? r.reserve : m, null) };
+}
+
+/* ============================================================
+   АУДИТ — автоматический внутренний контроль отчёта */
+function runAudit(d, la){
+  const A = [];
+  const add = (grp, name, st, note) => A.push({ grp, name, st, note: note || '' });
+  const Y = 'ok', W = 'warn', X = 'fail';
+
+  // I. Комплектность
+  const req = ['ЗАПРОС_НОМЕР','ЗАПРОС_ДАТА','ОБЪЕКТ_НАИМ','ПОЛЬЗОВАТЕЛЬ_НАИМ','ВЛАДЕЛЕЦ_НАИМ','РАБОТЫ_НАЧАЛО','РАБОТЫ_ОКОНЧАНИЕ','ИСПОЛНИТЕЛЬ_РУК','ИСПОЛНИТЕЛЬ_СОСТАВ','НАРЯД_РЕКВИЗИТЫ','СХЕМА_РАБОТ','КЛИМАТ_ИСТОЧНИК','ЦЕНА_РАБОТЫ','ПРЕЙСКУРАНТ','ДОСТУП_УСЛОВИЯ','ПОДПИСАНТ_ДОЛЖ'];
+  const missing = req.filter(c => !raw(c));
+  add('I. Комплектность', 'Обязательные реквизиты паспорта', missing.length ? X : Y,
+      missing.length ? 'не заполнены: ' + missing.join(', ') : 'заполнены');
+  add('I. Комплектность', 'Перечень опор (подпункт «а» п. 13)', d.total ? Y : X,
+      d.total ? d.total + ' поз.' : 'лист «Опоры» пуст');
+  add('I. Комплектность', 'Схема размещения (подпункт «а» п. 13)', S.schemes.length ? Y : W,
+      S.schemes.length ? 'загружено листов: ' + S.schemes.length : 'не загружена — приложение А пусто');
+  add('I. Комплектность', 'Размещаемые элементы сети электросвязи (лист «Кабели»)', S.cables.length ? Y : X,
+      S.cables.length ? S.cables.length + ' поз.' : 'лист «Кабели» пуст — оценка по подпункту «б» невозможна');
+  add('I. Комплектность', 'Климатические условия и их источник',
+      (!raw('КЛИМАТ_ИСТОЧНИК')) ? X : (CLIMATE_AUTO ? W : Y),
+      (!raw('КЛИМАТ_ИСТОЧНИК')) ? 'не указан источник — значения без источника не имеют доказательственной силы' :
+      (CLIMATE_AUTO ? 'определены автоматически по месту расположения; источник: ' + raw('КЛИМАТ_ИСТОЧНИК') + ' — подтвердить по региональным картам' :
+       'источник: ' + raw('КЛИМАТ_ИСТОЧНИК')));
+  const orphanL = {};
+  const namedL = {}; (S.lines||[]).forEach(l => { if (l['Линия / фидер']) namedL[String(l['Линия / фидер']).trim()] = 1; });
+  S.poles.forEach(r => { const k = String(r['Линия / фидер'] || '').trim(); if (k && !namedL[k]) orphanL[k] = 1; });
+  const oL = Object.keys(orphanL);
+  add('I. Комплектность', 'Пообъектная идентификация линий (лист «Линии»)',
+      !(S.lines||[]).length ? X : (oL.length ? W : Y),
+      !(S.lines||[]).length ? 'лист не заполнен: инвентарные номера и основания права по линиям не приведены' :
+      (oL.length ? 'нет описания линий: ' + oL.slice(0,4).join('; ') : (S.lines.length + ' линий описано')));
+  add('I. Комплектность', 'Исходные данные и их источники (ст. 759 ГК РФ)',
+      raw('ИСХОДНЫЕ_ДАННЫЕ') ? Y : X,
+      raw('ИСХОДНЫЕ_ДАННЫЕ') ? 'приведены' : 'раздел не заполнен');
+  add('I. Комплектность', 'Работы, не выполнявшиеся (граница с инженерными изысканиями)',
+      raw('РАБОТЫ_НЕ_ВЫПОЛНЯЛИСЬ') ? Y : X,
+      raw('РАБОТЫ_НЕ_ВЫПОЛНЯЛИСЬ') ? 'перечень приведён' : 'перечень отсутствует — отчёт не отграничен от состава изысканий по СП 47.13330.2016');
+  /* Численность бригады больше не блокирует выпуск отчёта: осмотр в охранной
+     зоне действующей ВЛ может выполняться одним работником по распоряжению.
+     Проверяется другое — назван ли состав, есть ли организационный документ и
+     соответствует ли его вид выбранной схеме производства работ. */
+  const crew = String(raw('ИСПОЛНИТЕЛЬ_СОСТАВ')).split(/[;\n]/).filter(x => x.trim()).length;
+  const schemeTxt = String(raw('СХЕМА_РАБОТ') || '');
+  const ordTxt = String(raw('НАРЯД_РЕКВИЗИТЫ') || '').toLowerCase();
+  const ordMismatch =
+    (/по наряду-допуску/.test(schemeTxt) && /распоряжен/.test(ordTxt) && !/наряд/.test(ordTxt)) ||
+    (/по распоряжению/.test(schemeTxt) && /наряд/.test(ordTxt) && !/распоряжен/.test(ordTxt));
+  add('I. Комплектность', 'Организация работ: состав исполнителей, организационный документ, схема',
+      (crew >= 1 && raw('НАРЯД_РЕКВИЗИТЫ') && raw('СХЕМА_РАБОТ') && !ordMismatch) ? Y : X,
+      crew < 1 ? 'состав исполнителей не указан' :
+      (!raw('НАРЯД_РЕКВИЗИТЫ') ? 'не указаны реквизиты наряда-допуска либо распоряжения (приказ Минтруда России № 903н)' :
+       (!raw('СХЕМА_РАБОТ') ? 'не указана схема производства работ' :
+        (ordMismatch ? 'вид организационного документа не соответствует схеме производства работ: «' + schemeTxt + '» ↔ «' + raw('НАРЯД_РЕКВИЗИТЫ') + '»' :
+         'работников: ' + crew + '; ' + raw('НАРЯД_РЕКВИЗИТЫ')))));
+  add('I. Комплектность', 'Техническое задание и программа работ', (raw('ТЗ_НОМЕР') && raw('ПРОГРАММА_НОМЕР')) ? Y : W,
+      (raw('ТЗ_НОМЕР') && raw('ПРОГРАММА_НОМЕР')) ? raw('ТЗ_НОМЕР') + '; ' + raw('ПРОГРАММА_НОМЕР') : 'реквизиты ТЗ/программы не указаны (ГОСТ 31937-2024)');
+  add('I. Комплектность', 'Сведения об охранной зоне (ПП РФ № 160)', raw('ОХРАННАЯ_ЗОНА') ? Y : W,
+      raw('ОХРАННАЯ_ЗОНА') ? 'указаны' : 'не указаны');
+
+  // II. Непротиворечивость
+  const bad1 = S.poles.filter(r => /аварий/.test(norm(r['Состояние конструкции (ГОСТ 31937-2024)'])) && norm(r['Технологическая возможность']) === 'есть');
+  add('II. Непротиворечивость', 'Аварийное состояние ↔ вывод «есть»', bad1.length ? X : Y,
+      bad1.length ? 'конфликт по опорам: ' + bad1.map(r => r['№ опоры']).join(', ') : 'конфликтов нет');
+  const bad2 = S.poles.filter(r => NC(r['Категория дефекта']) === 'A' && norm(r['Технологическая возможность']) === 'есть');
+  add('II. Непротиворечивость', 'Дефект категории А ↔ вывод «есть»', bad2.length ? W : Y,
+      bad2.length ? 'проверить опоры: ' + bad2.map(r => r['№ опоры']).join(', ') : 'конфликтов нет');
+  const bad3 = S.poles.filter(r => /при услов/.test(norm(r['Технологическая возможность'])) && String(r['Мероприятие'] || '').trim() === '');
+  add('II. Непротиворечивость', '«Есть при условии» ↔ мероприятие указано', bad3.length ? W : Y,
+      bad3.length ? 'мероприятие не указано у опор: ' + bad3.map(r => r['№ опоры']).join(', ') : 'соответствие обеспечено');
+  add('II. Непротиворечивость', 'Мероприятия при условном/отсутствующем доступе', ((d.tvCond + d.tvNo) > 0 && !S.acts.length) ? X : Y,
+      ((d.tvCond + d.tvNo) > 0 && !S.acts.length) ? 'приложение Е пусто при наличии ограничений' : 'соответствие обеспечено');
+
+  /* счётчик категории А считается из ведомости, а не задаётся отдельно */
+  const catSum = d.catA + d.catB + d.catV;
+  add('II. Непротиворечивость', 'Счётчик дефектов по категориям = числу строк ведомости',
+      (catSum === d.defects.length) ? Y : X,
+      'ведомость — ' + d.defects.length + ' поз.; по категориям A/Б/В — ' + d.catA + '/' + d.catB + '/' + d.catV);
+  add('II. Непротиворечивость', 'Сумма по технологической возможности = числу опор',
+      ((d.tvYes + d.tvCond + d.tvNo) === d.total) ? Y : X,
+      d.tvYes + ' + ' + d.tvCond + ' + ' + d.tvNo + ' = ' + (d.tvYes + d.tvCond + d.tvNo) + ' при ' + d.total + ' опорах');
+  add('II. Непротиворечивость', 'Аварийные опоры не суммируются с ограниченно работоспособными',
+      (d.cntBad === d.tvNo) ? Y : X,
+      'аварийных — ' + d.cntBad + ', «доступ отсутствует» — ' + d.tvNo);
+  add('II. Непротиворечивость', 'Число мероприятий = числу строк приложения Е',
+      (d.actsTotal === S.acts.length) ? Y : X,
+      'приложение Е — ' + S.acts.length + ' поз. (Е.1 — ' + d.actsE1.length + ', Е.2 — ' + d.actsE2.length + ')');
+
+  /* одна опора × один вид измерения = одна строка */
+  const seen = {}, dups = [];
+  S.meas.forEach(m => {
+    const k = String(m['№ опоры'] || '') + '|' + String(m['Линия / фидер'] || '') + '|' + String(m['Вид измерения'] || '');
+    if (seen[k] !== undefined && seen[k] !== String(m['Значение'])) dups.push('оп. № ' + (m['№ опоры'] || '?'));
+    seen[k] = String(m['Значение']);
+  });
+  add('II. Непротиворечивость', 'Уникальность строк протокола (опора × вид измерения)', dups.length ? X : Y,
+      dups.length ? 'дублирование с разными значениями: ' + [...new Set(dups)].slice(0,6).join(', ') : 'дублирования нет');
+
+  /* дефект «отклонение» ↔ измерение «соответствует» */
+  const conflict = [];
+  S.poles.forEach(p => {
+    const txt = String(p['Дефект'] || '') + ' ' + String(p['Примечание'] || '');
+    if (!/отклонен|наклон|вертикал/i.test(txt)) return;
+    const mm = S.meas.filter(m => String(m['№ опоры']) === String(p['№ опоры']) &&
+                                  /отклонение стойки/i.test(String(m['Вид измерения'] || '')));
+    if (mm.length && mm.every(m => !isBad(m['Вывод']))) conflict.push(String(p['№ опоры']));
+  });
+  add('II. Непротиворечивость', 'Дефект «отклонение» ↔ протокол «соответствует»', conflict.length ? X : Y,
+      conflict.length ? 'конфликт по опорам: ' + conflict.join(', ') : 'конфликтов нет');
+
+  /* тиражирование одного значения на группу опор */
+  const tir = {};
+  S.meas.forEach(m => {
+    const k = String(m['Вид измерения'] || '') + '|' + String(m['Значение']);
+    tir[k] = (tir[k] || 0) + 1;
+  });
+  const mass = Object.keys(tir).filter(k => tir[k] >= 5);
+  add('III. Метрология', 'Раздельность измерений (нет тиражирования значения)', mass.length ? X : Y,
+      mass.length ? mass.slice(0,3).map(k => '«' + k.split('|')[1] + '» — на ' + tir[k] + ' опор').join('; ') +
+        ' — протокол теряет доказательственную силу' : 'каждое измерение привязано к своей опоре');
+
+  /* привязка строк протокола к опоре */
+  const noPole = S.meas.filter(m => String(m['№ опоры'] || '').trim() === '');
+  add('III. Метрология', 'Все строки протокола привязаны к опоре', noPole.length ? X : Y,
+      noPole.length ? 'без привязки: ' + noPole.length + ' строк' : 'привязка обеспечена');
+
+  /* заявленные методы подтверждены протоколами */
+  const methods = raw('РАБОТЫ_МЕТОДЫ');
+  const hasBeton = S.meas.some(m => /прочность бетона/i.test(String(m['Вид измерения'] || '')));
+  const declBeton = /22690|прочност\w* бетона/i.test(methods);
+  add('III. Метрология', 'Заявленные методы подтверждены протоколами',
+      (declBeton && !hasBeton) ? X : Y,
+      (declBeton && !hasBeton) ? 'заявлен неразрушающий контроль прочности бетона по ГОСТ 22690-2015, но в приложении Г нет ни одного такого измерения' :
+        'расхождений нет');
+  const corr = S.poles.filter(r => /коррози|защитн[а-яё]* сло/i.test(String(r['Дефект'] || '')));
+  const corrNoNK = corr.filter(r => !S.meas.some(m => String(m['№ опоры']) === String(r['№ опоры']) &&
+                                                      /прочность бетона/i.test(String(m['Вид измерения'] || ''))));
+  add('III. Метрология', 'Контроль прочности на опорах с коррозией арматуры', corrNoNK.length ? X : Y,
+      corrNoNK.length ? 'нет НК прочности на опорах: ' + corrNoNK.map(r => r['№ опоры']).join(', ') +
+        ' — категория состояния не обоснована инструментально' : 'обеспечен');
+
+  /* геометрия подвеса */
+  const geo = [];
+  S.cables.forEach(c => {
+    const h = num(c['Высота подвеса, м']);
+    const need = num(d.gabOksn ? String(d.gabOksn).replace(',', '.') : 5) || 5;
+    if (h > 0 && h < need) geo.push(String(c['Марка (из «Спр_Кабели»)'] || '') + ': ' + h + ' м < ' + need + ' м');
+  });
+  add('II. Непротиворечивость', 'Высота подвеса ≥ нормируемого габарита ОК', geo.length ? X : Y,
+      geo.length ? geo.join('; ') + ' — норматив не обеспечивается ни при какой стреле провеса' :
+        'геометрия подвеса непротиворечива');
+
+  // III. Метрология
+  const usedSI = {};
+  S.meas.forEach(m => { const k = String(m['Средство измерения'] || '').trim(); if (k) usedSI[k] = true; });
+  const siNames = S.si.map(r => (String(r['Тип / марка'] || '') + ' ' + String(r['Наименование средства измерения'] || '')).toLowerCase());
+  const orphan = Object.keys(usedSI).filter(k => !siNames.some(n => n.indexOf(k.toLowerCase()) >= 0));
+  add('III. Метрология', 'Все СИ из протоколов внесены в приложение Д', orphan.length ? X : Y,
+      orphan.length ? 'нет сведений о поверке: ' + orphan.join(', ') : 'соответствие обеспечено');
+  const noFgis = S.si.filter(r => !String(r['№ записи о поверке во ФГИС «Аршин»'] || '').trim());
+  add('III. Метрология', 'Записи о поверке во ФГИС «Аршин» (приказ № 2510)', noFgis.length ? W : (S.si.length ? Y : W),
+      noFgis.length ? 'нет записи у ' + noFgis.length + ' СИ' : (S.si.length ? 'указаны' : 'лист «СИ» пуст'));
+  const to = toDate(raw('РАБОТЫ_ОКОНЧАНИЕ'));
+  const expired = S.si.filter(r => { const dd = toDate(r['Поверка действительна до']); return dd && to && dd < to; });
+  add('III. Метрология', 'Поверки действительны на период работ', expired.length ? X : Y,
+      expired.length ? 'просрочены на дату окончания работ: ' + expired.map(r => r['Тип / марка']).join(', ') : 'действительны');
+
+  /* IV. Сроки — договорный и предельные по Регламенту (раздел 6).
+     Договорный срок обязателен для ГОИ и контролируется наравне с
+     предельными (пункт 6.1.4); предельные применяются единообразно ко
+     всем заказам независимо от протяжённости объекта (пункты 6.1.2,
+     6.1.3, 1.3.1). */
+  const rep = toDate(raw('ОТЧЁТ_ДАТА'));
+  const DL = d.dl || {};
+  const dl = DL.dogovor || null;
+  const pauseNote = DL.pause ? ' (учтено приостановление ' + DL.pause + ' раб. дн., пункт 6.2.3)' : '';
+
+  add('IV. Сроки', 'Соблюдение срока выполнения работ по договору', (rep && dl) ? (rep <= dl ? Y : X) : W,
+      (rep && dl) ? ('отчёт ' + fmtDate(rep) + ', срок по договору ' + fmtDate(dl) +
+                     (rep <= dl ? '' : ' — срок нарушен; пункт 6.1.4 Регламента'))
+                  : 'не заполнена дата отчёта либо срок выполнения работ по договору');
+
+  add('IV. Сроки', 'Договорный срок не превышает предельный (80 раб. дн.)',
+      (dl && DL.regPPO) ? (dl <= DL.regPPO ? Y : X) : W,
+      (dl && DL.regPPO) ? ('по договору ' + fmtDate(dl) + ', предел ' + fmtDate(DL.regPPO) +
+        (dl <= DL.regPPO ? '' : ' — договором установлен срок сверх предельного, пункт 6.1.3 Регламента') + pauseNote)
+        : 'не заполнена дата регистрации обращения либо срок по договору');
+
+  add('IV. Сроки', 'Предельный срок предпроектного обследования (80 раб. дн.)',
+      (rep && DL.regPPO) ? (rep <= DL.regPPO ? Y : X) : W,
+      (rep && DL.regPPO) ? ('отчёт ' + fmtDate(rep) + ', предел ' + fmtDate(DL.regPPO) +
+        ', израсходовано раб. дн.: ' + DL.workSpent + pauseNote +
+        (rep <= DL.regPPO ? '' : ' — пункт 6.1.2 Регламента'))
+        : 'не заполнена дата регистрации обращения либо дата отчёта');
+
+  add('IV. Сроки', 'Предельный срок обследования с измерениями (60 раб. дн.)',
+      (rep && DL.reg6) ? (rep <= DL.reg6 ? Y : X) : W,
+      (rep && DL.reg6) ? ('заказ в работе с ' + fmtDate(DL.work) + ', предел ' + fmtDate(DL.reg6) +
+        ', израсходовано раб. дн.: ' + DL.e6Spent + pauseNote +
+        (rep <= DL.reg6 ? '' : ' — пункты 6.1.2, 6.2.2 Регламента'))
+        : 'не заполнена дата передачи заказа в работу (этап 4) либо дата поступления аванса');
+
+  // V. Несущая способность
+  if (la && la.rows.length){
+    const neg = la.rows.filter(r => r.reserve !== null && r.reserve < 0);
+    const low = la.rows.filter(r => r.reserve !== null && r.reserve >= 0 && r.reserve < 10);
+    const noM = la.rows.filter(r => r.reserve === null && !r.tensioned);
+    add('V. Несущая способность', 'Запас по всем типам опор неотрицателен', neg.length ? X : Y,
+        neg.length ? 'дефицит: ' + neg.map(r => r.mark + ' (' + r.reserve.toFixed(1) + '%)').join(', ') : 'обеспечен');
+    add('V. Несущая способность', 'Запас не менее 10 %', low.length ? W : Y,
+        low.length ? 'малый запас: ' + low.map(r => r.mark + ' (' + r.reserve.toFixed(1) + '%)').join(', ') : 'обеспечен');
+    add('V. Несущая способность', 'Допустимые моменты заданы для всех типов', noM.length ? W : Y,
+        noM.length ? 'не задан момент: ' + noM.map(r => r.mark).join(', ') : 'заданы');
+
+    /* собственные провода ВЛ в расчёте */
+    const own = S.loadWires.filter(w => /провода ВЛ|грозотрос/i.test(String(w['Принадлежность'] || '')));
+    add('V. Несущая способность', 'В расчёте учтены собственные провода ВЛ',
+        (S.loadWires.length && !own.length) ? X : (S.loadWires.length ? Y : X),
+        !S.loadWires.length ? 'существующая подвеска не задана — расчёт учитывает только новый кабель и завышает запас' :
+        (!own.length ? 'в Блоке 2 нет позиций с принадлежностью «Владелец (провода ВЛ)» — фактическая нагрузка занижена' :
+         'учтено позиций: ' + own.length));
+    /* тип подвески определён */
+    const undef = S.loadWires.filter(w => /не определ/i.test(String(w['Марка провода / кабеля'] || '')));
+    add('V. Несущая способность', 'Тип ранее размещённых кабелей установлен', undef.length ? X : Y,
+        undef.length ? 'позиций с типом «не определён»: ' + undef.length + ' — количественная оценка недостоверна' : 'установлен');
+    /* тяжение для опор, воспринимающих тяжение */
+    add('V. Несущая способность', 'Опоры, воспринимающие тяжение, вынесены в поверочный расчёт',
+        la.noQuant.length ? Y : Y,
+        la.noQuant.length ? 'количественная оценка не выдаётся по маркам: ' +
+          [...new Set(la.noQuant.map(r => r.mark))].join(', ') + '; поверочный расчёт включён в приложение Е.1' :
+          'опор, воспринимающих неуравновешенное тяжение, нет');
+    const kvMix = S.loadWires.filter(w => { const k = String(w['Класс напряжения, кВ'] || '').trim(); return !k || /все\s*класс/i.test(k); });
+    add('V. Несущая способность', 'Существующая подвеска отнесена к классам напряжения',
+        (d.kvList.length > 1 && kvMix.length === S.loadWires.length && S.loadWires.length) ? W : Y,
+        (d.kvList.length > 1 && kvMix.length === S.loadWires.length && S.loadWires.length) ?
+          'объект включает несколько классов напряжения, но ни одна позиция подвески к классу не отнесена — нагрузка 10 кВ учитывается на опорах 0,4 кВ' :
+          'отнесение выполнено');
+    /* пролёты свыше габаритного */
+    const overNoAct = d.overSpans.filter(r => !String(r['Мероприятие'] || '').trim());
+    add('V. Несущая способность', 'Пролёты свыше габаритного обеспечены мероприятием',
+        d.overSpans.length ? (overNoAct.length ? X : Y) : Y,
+        !d.overSpans.length ? 'превышений нет' :
+        (overNoAct.length ? 'пролёт свыше габаритного у ' + d.overSpans.length + ' опор, из них без мероприятия — ' +
+          overNoAct.length + ': ' + overNoAct.slice(0, 6).map(r => 'оп. ' + r['№ опоры']).join(', ') +
+          '. Сначала убедитесь, что пролёты рассчитаны верно (проверка «Пролёт согласован с координатами опор»)' :
+          'превышений — ' + d.overSpans.length + ', по всем включено мероприятие поверочного расчёта'));
+    /* понижение для дефектных опор */
+    const der = la.rows.filter(r => r.derated);
+    add('V. Несущая способность', 'Учёт состояния дефектных опор в расчёте', der.length ? Y : Y,
+        der.length ? 'для ' + der.length + ' марок выполнен вариант с понижающим коэффициентом 0,8' :
+          'опор в ограниченно работоспособном состоянии нет');
+  } else {
+    add('V. Несущая способность', 'Оценка несущей способности (приложение Ж)', W,
+        'лист «Нагрузки» не заполнен — вывод по подпункту «б» опирается только на осмотр');
+  }
+
+  /* VI. Разделение ответственности */
+  const wrongE2 = S.acts.filter(r => String(r['Группа'] || '').indexOf('Е.2') === 0 &&
+                                     /пользовател/i.test(String(r['Исполнитель'] || '')));
+  /* Назначение пользователя исполнителем по группе Е.2 стало возможным
+     (раздел «Мероприятия»), поэтому это не ошибка формы, а решение, которое
+     должно быть осознанным: понижено до предупреждения. */
+  /* Возложение устранения эксплуатационных дефектов на пользователя — не
+     вопрос вкуса, а риск по пункту 3 части 1 статьи 10 Федерального закона
+     № 135-ФЗ и абзацу третьему пункта 18 Правил: содержание собственного
+     имущества лежит на владельце (статья 210 Гражданского кодекса). Поднято
+     до несоответствия — раньше это проходило как замечание и терялось. */
+  add('VI. Разделение ответственности', 'Дефекты эксплуатации не возложены на пользователя',
+      wrongE2.length ? X : Y,
+      wrongE2.length ? 'в группе Е.2 исполнителем указан пользователь инфраструктуры по ' + wrongE2.length +
+        ' поз. Устранение ранее возникших эксплуатационных дефектов относится к обязанностям владельца ' +
+        '(ст. 210 ГК РФ); возложение его на пользователя как условия доступа образует признаки навязывания ' +
+        'невыгодных условий (п. 3 ч. 1 ст. 10 Федерального закона № 135-ФЗ, абз. 3 п. 18 Правил)' :
+        'соответствие обеспечено');
+  const noTerm = d.actsE2.filter(r => !String(r['Срок выполнения'] || '').trim());
+  add('VI. Разделение ответственности', 'Сроки по мероприятиям владельца заданы', noTerm.length ? W : Y,
+      noTerm.length ? 'не указан срок по ' + noTerm.length + ' поз. группы Е.2' : 'заданы');
+  add('VI. Разделение ответственности', 'Аварийные опоры переданы в эксплуатацию',
+      (d.cntBad > 0 && !raw('АВАРИЙНЫЕ_ПЕРЕДАНЫ')) ? X : Y,
+      (d.cntBad > 0 && !raw('АВАРИЙНЫЕ_ПЕРЕДАНЫ')) ?
+        'выявлено аварийных опор: ' + d.cntBad + ', отметка о передаче в эксплуатирующее подразделение отсутствует' :
+        (d.cntBad ? raw('АВАРИЙНЫЕ_ПЕРЕДАНЫ') : 'аварийных опор нет'));
+
+  /* IV. Сроки — хронология */
+  const dReq = toDate(raw('ЗАПРОС_ДАТА')), dIn = toDate(raw('ЗАПРОС_ВХ_ДАТА')),
+        dDog = toDate(raw('ДОГОВОР_ДАТА')), dPay = toDate(raw('ОПЛАТА_ДАТА')),
+        dW1 = toDate(raw('РАБОТЫ_НАЧАЛО'));
+  const chron = [];
+  if (dReq && dIn && dIn < dReq) chron.push('регистрация запроса раньше его даты');
+  if (dIn && dDog && dDog < dIn) chron.push('договор заключён раньше регистрации запроса');
+  if (dPay && dW1 && dW1 < dPay) chron.push('работы начаты раньше оплаты (абз. 2 п. 16 Правил)');
+  /* Тип местности задаёт коэффициент ветровой нагрузки. Если подпись в поле не
+     распознана, расчёт молча идёт по типу В — при фактическом типе A нагрузка
+     занижается на 35 %. Молчать об этом нельзя. */
+  if (la && la.cl){
+    const terrOk = !!la.cl.kwKnown;
+    add('V. Несущая способность', 'Тип местности распознан и применён в расчёте',
+        terrOk ? Y : X,
+        terrOk ? 'тип «' + la.cl.terr + '», коэффициент ' + String(la.cl.kw).replace('.', ',')
+               : 'тип местности «' + raw('МЕСТНОСТЬ_ТИП') + '» не распознан — расчёт выполнен по типу «В» ' +
+                 '(коэффициент 0,65); значение в разделе 3.3 и коэффициент в приложении Ж не согласованы');
+    /* Нулевая нагрузка по марке при заданной подвеске — признак того, что
+       позиции подвески не сопоставились с классом напряжения опоры. */
+    const zero = la.rows.filter(r => !r.derated && !(r.Mex > 0) && !(r.Mnew > 0));
+    add('V. Несущая способность', 'Подвеска сопоставлена с классом напряжения опоры',
+        (zero.length && S.loadWires.length) ? X : Y,
+        (zero.length && S.loadWires.length)
+          ? 'нулевая нагрузка при заданной подвеске по маркам: ' +
+            zero.map(r => r.mark).join(', ') + ' — проверьте класс напряжения в блоке 2 листа «Нагрузки»'
+          : 'сопоставление выполнено');
+  }
+  add('IV. Сроки', 'Непротиворечивость хронологии', chron.length ? X : Y,
+      chron.length ? chron.join('; ') : 'последовательность дат непротиворечива');
+
+  /* Дополнительные проверки версии 3.2 вынесены в отдельный модуль, чтобы не
+     наращивать этот файл: применимость приборов, сверка пролётов с
+     координатами, обоснованность дефектов измерениями, срок по пункту 16
+     Правил и другие. Модуль подключается отдельным скриптом; если он не
+     загрузился, отчёт по-прежнему собирается, но контроль будет неполным. */
+  if (typeof PPOAudit !== 'undefined' && PPOAudit.extraChecks){
+    try{
+      const more = PPOAudit.extraChecks({
+        S, d, la, raw, toDate,
+        photoNames: S.photos.map(p => String(p.name || ''))
+      });
+      more.forEach(x => A.push(x));
+    }catch(err){
+      add('I. Комплектность', 'Дополнительные проверки версии 3.2', W,
+          'модуль проверок завершился с ошибкой: ' + err.message);
+    }
+  } else {
+    add('I. Комплектность', 'Дополнительные проверки версии 3.2', W,
+        'модуль ppo-audit.js не загружен — контроль выполнен в неполном объёме');
+  }
+
+  /* Незаполненные места в готовом документе. Проверка идёт по уже собранной
+     разметке, поэтому выполняется в render() и дописывается туда же. */
+  A.__placeholders = true;
+  return A;
+}
+/* автоматический текст «Ограничения исходных данных» — по фактическим пробелам */
+function limitsAuto(d){
+  const L = [];
+  if (S.loadWires.some(w => /не определ/i.test(String(w['Марка провода / кабеля'] || ''))))
+    L.push('тип и марка части ранее размещённых кабелей связи по данным осмотра не установлены; их характеристики приняты по обобщённым значениям');
+  if (S.loadWires.length && !S.loadWires.some(w => /провода ВЛ|грозотрос/i.test(String(w['Принадлежность'] || ''))))
+    L.push('марка и количество проводов ВЛ владельцем документально не подтверждены');
+  if (!tensionKnown())
+    L.push('монтажные тяжения проводов и ранее размещённых кабелей не установлены; момент от тяжения на анкерных, угловых, концевых и ответвительных опорах количественно не оценивался');
+  if (!(S.lines || []).length)
+    L.push('инвентарные номера и реквизиты права на линии, входящие в границы запроса, не представлены');
+  if (d.overSpans.length)
+    L.push('на ' + d.overSpans.length + ' опорах фактический пролёт превышает габаритный по типовому проекту');
+  const noMest = S.poles.filter(r => !String(r['Характер местности'] || '').trim()).length;
+  if (noMest) L.push('характер местности для ' + noMest + ' опор принят по общему значению объекта');
+  if (!L.length) return '';
+  return 'При выполнении работ установлены следующие ограничения исходных данных, влияющие на объём и точность выводов: ' +
+         L.join('; ') + '. В указанной части выводы отчёта подлежат подтверждению в проектной документации.';
+}
+/* Охранная зона: с единицами измерения и раздельно по классам напряжения.
+   Раньше в таблицу 3.1 попадало голое число («10»), которое при нескольких
+   классах на объекте вдобавок относилось сразу ко всем. */
+function ozText(d){
+  const list = (d.kvList || []).map(kv => {
+    const r = PPO.vlByKv(kv);
+    return r ? { kv, oz: r.oz } : null;
+  }).filter(Boolean);
+  if (!list.length){
+    const v = raw('ОХРАННАЯ_ЗОНА');
+    return v ? (/\sм\b/.test(v) ? esc(v) : esc(v) + ' м') : '<span class="fill">' + PH + '</span>';
+  }
+  const uniq = [...new Set(list.map(x => x.oz))];
+  if (uniq.length === 1) return String(uniq[0]).replace('.', ',') + ' м';
+  return list.map(x => String(x.oz).replace('.', ',') + ' м для ' + x.kv + ' кВ').join('; ');
+}
+function conclusionText(d){
+  const ov = raw('ВЫВОД_РУЧНОЙ');
+  if (ov) return esc(ov);
+  if (!d.total) return '<span class="fill">' + PH + '</span>';
+  const obj = raw('ОБЪЕКТ_НАИМ') || 'объекту инфраструктуры';
+  if (d.tvNo === 0 && d.tvCond === 0)
+    return 'Технологическая возможность предоставления доступа к ' + esc(obj) +
+      ' имеется в полном объёме — по всем опорам, вошедшим в границы запроса (' + d.total + ' шт.). ' +
+      'Размещение сети электросвязи не препятствует использованию объекта инфраструктуры по прямому назначению и обеспечивает безопасность его функционирования.';
+  if (d.tvNo === 0)
+    return 'Технологическая возможность предоставления доступа к ' + esc(obj) +
+      ' имеется по всем опорам, вошедшим в границы запроса (' + d.total + ' шт.), в том числе по ' +
+      d.tvYes + ' шт. — без дополнительных условий, по ' + d.tvCond +
+      ' шт. — после выполнения мероприятий, приведённых в разделе 6 и приложении Е настоящего отчёта.';
+  if (d.tvYes === 0 && d.tvCond === 0)
+    return 'Технологическая возможность предоставления доступа к ' + esc(obj) +
+      ' отсутствует. Размещение сети электросвязи на опорах в их фактическом техническом состоянии препятствовало бы использованию объекта инфраструктуры по прямому назначению и не обеспечивало бы безопасность его функционирования (абзац второй пункта 18 Правил).';
+  return 'Технологическая возможность предоставления доступа к ' + esc(obj) + ' имеется в ограниченном объёме: ' +
+    'без дополнительных условий доступ может быть предоставлен по опорам в количестве ' + d.tvYes +
+    ' шт., после выполнения мероприятий раздела 6 — по ' + d.tvCond + ' шт., по ' + d.tvNo +
+    ' шт. доступ предоставлен быть не может. В соответствии с пунктом 25 Правил пользователю инфраструктуры направляется уведомление о том, на каких условиях и в каком объёме может быть предоставлен доступ.';
+}
+
+function loadText(d){
+  if (!d.total) return '<span class="fill">' + PH + '</span>';
+  const marks = S.cables.map(c => String(c['Марка (из «Спр_Кабели»)'] || c['Марка'] || '').trim()).filter(Boolean);
+  const c = marks.length ? marks.join(', ') : 'размещаемых элементов сети электросвязи';
+  let t = 'Оценка выполнена применительно к суммарным дополнительным нагрузкам от ' + esc(c) +
+    ' (собственный вес, гололёдная и ветровая нагрузки, тяжение) при расчётных климатических условиях, приведённых в подразделе 3.3. ';
+  if (d.cntBad > 0)
+    t += 'Опор, отнесённых по результатам осмотра к аварийной категории технического состояния, — ' + d.cntBad +
+      ' шт.; восприятие дополнительных нагрузок в их фактическом состоянии не обеспечивается, размещение до восстановления несущей способности не допускается. ';
+  if (d.cntLim > 0)
+    t += 'Опор, отнесённых к ограниченно работоспособной категории, — ' + d.cntLim +
+      ' шт.; восприятие дополнительных нагрузок обеспечивается при условии выполнения мероприятий, приведённых в приложении Е. ';
+  t += 'По остальным опорам (' + d.cntOk + ' шт.) ограничений по восприятию дополнительных нагрузок не выявлено.';
+  return t;
+}
+
+function clearanceText(d){
+  if (!d.total) return '<span class="fill">' + PH + '</span>';
+  const hs = S.cables.map(c => String(c['Высота подвеса, м'] || '').trim()).filter(Boolean);
+  const h = hs.length ? hs.join('; ') : '';
+  let t = 'Проверено сохранение нормируемых расстояний от проводов до поверхности земли, пересекаемых объектов и насаждений, а также изоляционных расстояний до токоведущих частей, установленных главой 2.5 ПУЭ-7. ';
+  if (h) t += 'Высота подвеса, заявленная пользователем инфраструктуры, — ' + esc(h) +
+    ' м от точки крепления; фактический габарит кабеля в наинизшей точке пролёта определяется стрелой провеса и устанавливается проектной документацией. ';
+  if (d.measBadG1.length)
+    t += 'По результатам измерений фактического состояния выявлено ' + d.measBadG1.length + ' ' +
+      plural(d.measBadG1.length, 'отклонение', 'отклонения', 'отклонений') +
+      ' от нормативных требований (приложение Г.1); соответствующие мероприятия включены в приложение Е.2. ';
+  else
+    t += 'Отклонений фактического состояния от нормативных требований не выявлено (приложение Г.1). ';
+  if (d.measBadG2.length)
+    t += 'Недостаточность свободных интервалов под размещение кабеля установлена по ' + d.measBadG2.length + ' ' +
+      plural(d.measBadG2.length, 'позиции', 'позициям', 'позициям') +
+      ' (приложение Г.2); проектные решения по ним отнесены к приложению Е.1.';
+  else if (d.measG2.length)
+    t += 'Свободных интервалов под размещение кабеля достаточно по всем проверенным позициям (приложение Г.2).';
+  return t;
+}
+
+/* ============================================================ ТАБЛИЦЫ */
+function tblKV(rows){
+  let h = '<table class="t kv"><thead><tr><th>Сведения</th><th>Значение</th></tr></thead><tbody>';
+  rows.forEach(r => { h += '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>'; });
+  return h + '</tbody></table>';
+}
+function fmtCell(v){
+  if (v === '' || v === undefined || v === null) return '—';
+  if (typeof v === 'number'){
+    if (Number.isInteger(v)) return String(v);
+    return String(Math.round(v * 100) / 100).replace('.', ',');
+  }
+  let t = String(v).trim();
+  if (/^\d+\.\d+$/.test(t)) t = t.replace('.', ',');   // десятичные — запятой
+  return t;
+}
+/* Формулы шаблона в браузере не вычисляются, поэтому графы «Дефект» и
+   «Примечание» подстраховываются справочником: пустых клеток в ведомости
+   дефектов быть не должно. */
+function defDescr(r){
+  const own = String(r['Дефект'] || '').trim();
+  if (own) return own;
+  const df = (typeof PPO !== 'undefined')
+    ? PPO.defectByCat(String(r['Категория дефекта'] || '—').trim() || '—') : null;
+  return df && df.txt ? df.txt : '';
+}
+function defNote(r){
+  const own = String(r['Примечание'] || '').trim();
+  if (own) return own;
+  const df = (typeof PPO !== 'undefined')
+    ? PPO.defectByCat(String(r['Категория дефекта'] || '—').trim() || '—') : null;
+  return df && df.note ? df.note : '';
+}
+function dataTable(rows, cols, widths, empty){
+  if (!rows.length) return '<p class="empty-note">' + empty + '</p>';
+  const wide = cols.length >= 8;
+  let h = '<table class="t' + (wide ? ' wide' : '') + '"><colgroup>';
+  widths.forEach(w => { h += '<col style="width:' + w + '%">'; });
+  h += '</colgroup><thead><tr>';
+  cols.forEach(c => { h += '<th>' + esc(c.h) + '</th>'; });
+  h += '</tr></thead><tbody>';
+  rows.forEach((r, i) => {
+    h += '<tr>';
+    cols.forEach(c => {
+      const v = (typeof c.f === 'function') ? c.f(r, i) : r[c.k];
+      h += '<td' + (c.n ? ' class="n"' : '') + '>' + esc(fmtCell(v)) + '</td>';
+    });
+    h += '</tr>';
+  });
+  return h + '</tbody></table>';
+}
+
+/* ============================================================ РЕНДЕР */
+function render(){
+  const d = derive();
+  const la = assessAll();
+  const audit = runAudit(d, la);
+  const objName = F('ОБЪЕКТ_НАИМ');
+  const ed = (id, html) => '<span class="edit" contenteditable="true" id="' + id + '">' + html + '</span>';
+
+  let H = '';
+
+  /* ---- титул ---- */
+  H += '<div class="letterhead">' +
+    '<div class="lh-full">ПУБЛИЧНОЕ АКЦИОНЕРНОЕ ОБЩЕСТВО «РОССЕТИ ЮГ»</div>' +
+    '<div class="lh-branch">ФИЛИАЛ ПАО «РОССЕТИ ЮГ» — «КУБАНЬЭНЕРГО»</div>' +
+    '<div class="lh-sub">' + (raw('ВЛАДЕЛЕЦ_ФИЛИАЛ') ? esc(raw('ВЛАДЕЛЕЦ_ФИЛИАЛ').replace(/^.*?,\s*/, '')) + ' · ' : '') +
+      esc(raw('ВЛАДЕЛЕЦ_АДРЕС') || '') + '</div>' +
+    '</div><hr class="lh-rule"><hr class="lh-rule2">';
+  H += '<p class="r">УТВЕРЖДАЮ</p>';
+  H += '<p class="r">' + F('УТВ_ДОЛЖ') + '</p>';
+  H += '<p class="r">_______________ ' + F('УТВ_ФИО') + '</p>';
+  H += '<p class="r">«____» _______________ ' + d.year + ' г.</p>';
+  H += '<div class="spacer"></div>';
+  H += '<p class="title-main">ОТЧЁТ</p>';
+  H += '<p class="c"><b>о результатах работ по осмотру, измерению и обследованию объекта инфраструктуры, выполненных для предоставления информации, предусмотренной пунктом 13 Правил недискриминационного доступа к инфраструктуре для размещения сетей электросвязи (утв. постановлением Правительства Российской Федерации от 22.11.2022 № 2106)</b></p>';
+  H += '<div class="spacer"></div>';
+  H += '<p class="c">Объект инфраструктуры: ' + objName + '</p>';
+  H += '<p class="c">' + F('ОБЪЕКТ_МЕСТО') + '</p>';
+  H += '<p class="c">&nbsp;</p>';
+  H += '<p class="c">Пользователь инфраструктуры: ' + F('ПОЛЬЗОВАТЕЛЬ_НАИМ') + '</p>';
+  H += '<p class="c">Запрос ' + F('ЗАПРОС_НОМЕР') + ' от ' + F('ЗАПРОС_ДАТА') + '</p>';
+  H += '<div class="spacer"></div>';
+  H += '<p class="c">Регистрационный номер ' + F('ОТЧЁТ_НОМЕР') + ' от ' + F('ОТЧЁТ_ДАТА') + '</p>';
+  H += '<p class="c">' + d.year + '</p>';
+
+  /* ---- служебные отметки ---- */
+  H += '<h1 class="pb">Служебные отметки</h1>';
+  H += tblKV([
+    ['Основание выполнения работ', 'Запрос пользователя инфраструктуры ' + F('ЗАПРОС_НОМЕР') + ' от ' + F('ЗАПРОС_ДАТА') +
+      ' (' + F('ЗАПРОС_ВХ_НОМЕР') + ' от ' + F('ЗАПРОС_ВХ_ДАТА') + '); пункт 13 Правил; договор (счёт) ' +
+      F('ДОГОВОР_НОМЕР') + ' от ' + F('ДОГОВОР_ДАТА') + ' — работы по осмотру, измерению и обследованию объекта инфраструктуры (абзац второй пункта 16 Правил)'],
+    ['Контрольные сроки',
+      '<b>Срок по договору (счёту):</b> ' +
+      (d.deadline ? '<b>' + d.deadline + '</b>' : '<span class="fill">' + PH + '</span>') +
+      ' <small>— договор (счёт) ' + F('ДОГОВОР_НОМЕР') + ' от ' + F('ДОГОВОР_ДАТА') +
+      '; обязателен и контролируется наравне с предельными сроками (пункт 6.1.4 Регламента)</small><br>' +
+      '<b>Предельный срок по пункту 16 Правил:</b> ' +
+      (d.dlP16 ? '<b>' + d.dlP16 + '</b>' : '<span class="fill">' + PH + '</span>') +
+      ' <small>— 30 рабочих дней со дня получения запроса</small><br>' +
+      '<b>Предельный срок предпроектного обследования:</b> ' +
+      (d.dlPPO ? '<b>' + d.dlPPO + '</b>' : '<span class="fill">' + PH + '</span>') +
+      ' <small>— 80 рабочих дней (пункт 6.1.2 Регламента), единообразно ко всем заказам независимо от протяжённости объекта (пункт 6.1.3)</small><br>' +
+      '<b>Предельный срок обследования с измерениями (этап 6):</b> ' +
+      (d.dlE6 ? '<b>' + d.dlE6 + '</b>' : '<span class="fill">' + PH + '</span>') +
+      ' <small>— 60 рабочих дней с даты передачи заказа в работу (пункты 6.1.2, 6.2.2 Регламента)</small>' +
+      (d.dl.pause ? '<br><small>Учтено приостановление срока: ' + d.dl.pause +
+        ' раб. дн. (пункт 6.2.3 Регламента)</small>' : '') +
+      '<br><small>Сроки исчисляются в рабочих днях; течение начинается со следующего рабочего дня после наступления события (пункт 6.2.1 Регламента).</small>'],
+    ['Режим информации', 'Конфиденциально. Предоставляется при наличии письменного обязательства пользователя инфраструктуры о сохранении конфиденциальности и неиспользовании информации в противоправных целях (пункт 15 Правил). Обязательство: ' + F('КОНФИД_ОБЯЗАТ') + ', подписант — ' + F('КОНФИД_ПОДПИСАНТ') + '. <small>Обязательство по пункту 15 Правил является самостоятельным документом; реквизиты договора (счёта) его не заменяют.</small>'],
+    ['Ответственность', 'Владелец инфраструктуры несёт ответственность за своевременность, полноту и достоверность предоставляемой информации (пункт 17 Правил)'],
+    ['Срок актуальности сведений', F('СРОК_МЕСЯЦЕВ') + ' мес. с даты отчёта — условие владельца инфраструктуры; Правилами такой срок не установлен. По истечении срока, а также при изменении схемы, состава размещённых элементов или заявленных характеристик кабеля сведения подлежат подтверждению повторным осмотром'],
+    ['Организация, выполнившая работы', F('ИСПОЛНИТЕЛЬ_ОРГ')],
+    ['Руководитель работ', F('ИСПОЛНИТЕЛЬ_РУК')],
+    ['Правовая квалификация работ', 'Обследование объекта инфраструктуры в целях рассмотрения заявления о предоставлении доступа. Отчёт <b>не является</b> результатом инженерных изысканий в значении статьи 47 Градостроительного кодекса Российской Федерации, проектной документацией в значении статьи 48 Градостроительного кодекса Российской Федерации и Положения, утв. постановлением Правительства Российской Федерации от 16.02.2008 № 87, а также заключением об обследовании технического состояния строительных конструкций']
+  ]);
+
+  /* ---- 1 ---- */
+  H += '<h1>1 Основание, предмет и объём работ</h1>';
+  H += '<p class="ni">1.1 Настоящий отчёт подготовлен во исполнение запроса пользователя инфраструктуры ' + F('ЗАПРОС_НОМЕР') + ' от ' + F('ЗАПРОС_ДАТА') +
+    ' (зарегистрирован ' + F('ЗАПРОС_ВХ_НОМЕР') + ' от ' + F('ЗАПРОС_ВХ_ДАТА') + '), направленного в соответствии с пунктом 13 Правил недискриминационного доступа к инфраструктуре для размещения сетей электросвязи, утверждённых постановлением Правительства Российской Федерации от 22.11.2022 № 2106 (далее — Правила).</p>';
+  H += '<p class="ni">1.2 Предмет отчёта — предоставление пользователю инфраструктуры информации, предусмотренной подпунктами «а»–«д» пункта 13 Правил, в отношении объекта инфраструктуры ' + objName + '.</p>';
+  H += '<p class="ni">1.3 Для подготовки информации владельцем инфраструктуры выполнены работы по осмотру, измерению и обследованию объекта инфраструктуры. Основание взимания платы за предоставление информации — абзац второй пункта 16 Правил.</p>';
+  H += '<p class="ni">1.4 Отчёт не является проектной документацией и не заменяет проект размещения сети электросвязи. Приведённые сведения подлежат использованию пользователем инфраструктуры при разработке проектной документации.</p>';
+  H += '<h2>1.5 Границы работ по осмотру и измерению и их отграничение от проектной документации</h2>';
+  H += '<p class="ni">В предмет настоящего отчёта входят исключительно результаты осмотра и инструментальных измерений технического состояния объекта инфраструктуры, необходимые для оценки наличия технологической возможности доступа (пункт 6 Технических требований к размещению сетей электросвязи на ВЛ, утверждённых распоряжением ПАО «Россети» от 18.05.2026 № 282р; ГОСТ 31937-2024).</p>';
+  H += '<p class="ni">К предмету отчёта относятся:</p><ul>' +
+    '<li>визуальный осмотр надземной части опор и их конструктивных элементов (стойка, приставка, бандаж, траверса, узлы крепления) с выявлением дефектов и присвоением категории технического состояния по ГОСТ 31937-2024;</li>' +
+    '<li>инструментальные измерения геометрических и прочностных параметров (отклонение от вертикали, прочность бетона, габариты, расстояния, сопротивление заземления и др.);</li>' +
+    '<li>учёт ранее размещённых на опорах элементов сетей электросвязи (точек доступа);</li>' +
+    '<li>сводная оценка наличия (отсутствия) технологической возможности доступа по результатам осмотра и измерений.</li></ul>';
+  H += '<p class="ni">За границами отчёта и в предмет проектной документации пользователя инфраструктуры входят (носят в отчёте рекомендательный характер):</p><ul>' +
+    '<li>поверочные расчёты дополнительных и суммарных нагрузок на опоры по ПУЭ-7 (глава 2.5) и СП 20.13330.2016 (пункт 6 ТТ № 282р);</li>' +
+    '<li>выбор марок кабеля, типов и конкретных узлов крепления, натяжных и поддерживающих зажимов, линейной арматуры и её привязка к типам опор;</li>' +
+    '<li>определение точек и высот подвеса, стрел провеса, тяжений, схем прохождения трассы;</li>' +
+    '<li>технические решения по устранению выявленных дефектов и несоответствий (состав, объём, стоимость работ);</li>' +
+    '<li>мероприятия по пунктам 3–5 ТТ № 282р (бирки, экранирующие устройства, технологический запас, муфты, шкафы и пр.).</li></ul>';
+  H += '<p class="ni">Приведённые в разделах 5, 6 и приложении Ж отчёта оценки нагрузок и мероприятия являются предварительными (рекомендательными) и подлежат подтверждению и детализации в проектной документации в порядке пункта 6 ТТ № 282р и пункта 5.1 ТТ № 282р (размещение — только на основании согласованной с владельцем ВЛ проектной и рабочей документации).</p>';
+
+  H += '<h2>1.6 Работы, не выполнявшиеся</h2>';
+  H += '<p class="ni">При обследовании <b>не выполнялись</b>: ' + F('РАБОТЫ_НЕ_ВЫПОЛНЯЛИСЬ') + '.</p>';
+  H += '<p class="ni"><small>Перечисленные работы относятся к составу инженерных изысканий (статья 47 Градостроительного кодекса Российской Федерации, СП 47.13330.2016) и в предмет настоящего отчёта не входят. Выводы отчёта в части, зависящей от этих работ, подлежат подтверждению в проектной документации.</small></p>';
+
+  H += '<h2>1.7 Исходные данные и их источники</h2>';
+  H += '<p class="ni">' + F('ИСХОДНЫЕ_ДАННЫЕ') + '</p>';
+  const lim = raw('ОГРАНИЧЕНИЯ_ДАННЫХ') || limitsAuto(d);
+  if (lim){
+    H += '<h2>1.8 Ограничения исходных данных</h2>';
+    H += '<p class="ni">' + esc(lim) + '</p>';
+    H += '<p class="ni"><small>Настоящий раздел приведён во исполнение статьи 716 Гражданского кодекса Российской Федерации. Владелец инфраструктуры отвечает за достоверность собственных выводов; за полноту и достоверность данных, предоставленных иными лицами, ответственность несут предоставившие их лица (статья 759 Гражданского кодекса Российской Федерации).</small></p>';
+  }
+
+  /* ---- 2 ---- */
+  H += '<h1>2 Сведения о владельце и пользователе инфраструктуры</h1>';
+  H += tblKV([
+    ['Владелец инфраструктуры', F('ВЛАДЕЛЕЦ_НАИМ')],
+    ['Филиал / предприятие электрических сетей', F('ВЛАДЕЛЕЦ_ФИЛИАЛ')],
+    ['Адрес', F('ВЛАДЕЛЕЦ_АДРЕС')],
+    ['Основание владения объектом', F('ОБЪЕКТ_ВЛАДЕНИЕ')],
+    ['Пользователь инфраструктуры', F('ПОЛЬЗОВАТЕЛЬ_НАИМ')],
+    ['Адрес', F('ПОЛЬЗОВАТЕЛЬ_АДРЕС')]
+  ]);
+
+  /* ---- 3 ---- */
+  H += '<h1>3 Объект инфраструктуры и схемы его размещения</h1>';
+  H += '<p class="sec-note">Раздел содержит информацию, предусмотренную подпунктом «а» пункта 13 Правил.</p>';
+  H += '<h2>3.1 Общая характеристика объекта</h2>';
+  H += tblKV([
+    ['Вид объекта инфраструктуры', F('ОБЪЕКТ_ВИД')],
+    ['Наименование объекта', objName],
+    ['Класс(ы) напряжения', F('ОБЪЕКТ_КЛАСС') + ' кВ' + (d.voltMax && String(raw('ОБЪЕКТ_КЛАСС')).match(/[;,]/) ? ' (наибольший — ' + d.voltMax + ' кВ)' : '')],
+    ['Место расположения', F('ОБЪЕКТ_МЕСТО')],
+    ['Протяжённость участка', d.length ? d.length + ' км' : '<span class="fill">' + PH + '</span>'],
+    ['Количество опор в границах запроса', d.total ? d.total + ' шт.' : '<span class="fill">' + PH + '</span>'],
+    ['Типы применённых опор', d.poleTypes || '<span class="fill">' + PH + '</span>'],
+    ['Охранная зона (ПП РФ № 160 от 24.02.2009)', ozText(d)],
+    ['Сведения в информационной системе владельца', F('ИНФОСИСТЕМА')]
+  ]);
+  H += '<h2>3.2 Линии, входящие в границы запроса</h2>';
+  if (d.lines.length){
+    H += dataTable(d.lines, [
+      {h:'№', k:'№ п/п', n:true, f:(r,i)=> r['№ п/п'] || (i+1)},
+      {h:'Линия (фидер)', k:'Линия / фидер'},
+      {h:'Диспетчерское наименование', k:'Диспетчерское наименование'},
+      {h:'Инвентарный номер', k:'Инвентарный номер'},
+      {h:'Год ввода', k:'Год ввода', n:true},
+      {h:'Класс, кВ', k:'Класс напряжения, кВ', n:true},
+      {h:'Основание права', k:'Основание права (реквизиты)'},
+      {h:'Опор в границах запроса', k:'Опор в границах запроса', n:true}
+    ], [4,16,22,15,7,6,22,8], 'Лист «Линии» не заполнен.');
+    const rp = d.lines.map(l => String(l['Планы ремонта и реконструкции'] || '').trim()).filter(Boolean);
+    if (rp.length) H += '<p class="ni">Планы ремонта и реконструкции: ' + esc([...new Set(rp)].join('; ')) + '.</p>';
+    const cl2 = d.lines.map(l => String(l['Иные заявки на участок'] || '').trim()).filter(Boolean);
+    if (cl2.length) H += '<p class="ni">Иные заявки на участок: ' + esc([...new Set(cl2)].join('; ')) + '.</p>';
+  } else {
+    H += '<p class="empty-note">Лист «Линии» файла исходных данных не заполнен. Объект, включающий несколько линий, должен описываться пообъектно: диспетчерское наименование, инвентарный номер, год ввода, основание права по каждой ВЛ.</p>';
+  }
+  if (raw('РЕМОНТ_ПЛАНЫ') || raw('ЗАЯВКИ_ИНЫЕ')){
+    H += tblKV([
+      ['Планы ремонта и реконструкции объекта', F('РЕМОНТ_ПЛАНЫ')],
+      ['Иные заявки на тот же участок (очерёдность)', F('ЗАЯВКИ_ИНЫЕ')]
+    ]);
+  }
+
+  H += '<h2>3.3 Расчётные климатические условия</h2>';
+  H += tblKV([
+    ['Район по ветровому давлению (ПУЭ-7, табл. 2.5.1)', F('ВЕТЕР_РАЙОН') + ', ветровое давление — ' + F('ВЕТЕР_ДАВЛЕНИЕ') + ' Па'],
+    ['Район по гололёду (ПУЭ-7, табл. 2.5.3)', F('ГОЛОЛЁД_РАЙОН') + ', толщина стенки гололёда — ' + F('ГОЛОЛЁД_СТЕНКА') + ' мм'],
+    ['Тип местности по условиям воздействия ветра (ПУЭ-7, п. 2.5.6)', F('МЕСТНОСТЬ_ТИП')],
+    ['Сейсмичность площадки', F('СЕЙСМИКА')],
+    ['Источник климатических данных', F('КЛИМАТ_ИСТОЧНИК')]
+  ]);
+  if (raw('СЕЙСМИКА_УЧЁТ'))
+    H += '<p class="ni"><small>' + esc(raw('СЕЙСМИКА_УЧЁТ')) + '</small></p>';
+  H += '<h2>3.4 Нормируемые габариты и расстояния (по классам напряжения)</h2>';
+  if (d.kvList.length){
+    let gt = '<table class="t"><colgroup><col style="width:12%"><col style="width:22%"><col style="width:22%"><col style="width:22%"><col style="width:22%"></colgroup>' +
+      '<thead><tr><th>Класс напряжения, кВ</th><th>Габарит провода до земли (ПУЭ-7 табл. 2.5.20/2.5.22)</th>' +
+      '<th>Габарит ОК до земли (ПУЭ-7 п. 2.4.89; ТТ № 282р п. 3.2.4)</th>' +
+      '<th>Минимальное расстояние ОК–провод (ТТ № 282р п. 3.2.2)</th>' +
+      '<th>Охранная зона (ПП РФ № 160)</th></tr></thead><tbody>';
+    d.kvList.forEach(kv => {
+      const r = PPO.vlByKv(kv);
+      if (!r){ gt += '<tr><td class="n">' + esc(kv) + '</td><td colspan="4">нет в справочнике</td></tr>'; return; }
+      const nen = /ненасел|труднодост/.test(norm(raw('МЕСТНОСТЬ')));
+      const gz = d.mestMixed
+        ? (String(r.gz_nas).replace('.', ',') + ' м — населённая; ' + String(r.gz_nen).replace('.', ',') + ' м — ненаселённая')
+        : (String(nen ? r.gz_nen : r.gz_nas).replace('.', ',') + ' м');
+      gt += '<tr><td class="n">' + esc(kv) + '</td><td>' + gz + '</td><td class="n">' +
+        String(r.g_oksn).replace('.', ',') + ' м</td><td class="n">' +
+        String(r.d_oksn_prov).replace('.', ',') + ' м</td><td class="n">' + r.oz + ' м</td></tr>';
+    });
+    gt += '</tbody></table>';
+    H += gt;
+  }
+  H += tblKV([
+    ['Минимальное расстояние ОК до элементов опоры (ТТ № 282р п. 3.2.3)', '0,20 м'],
+    ['Минимальные расстояния между точками крепления кабелей (ТТ № 282р пп. 3.2.5–3.2.6)', 'по горизонтали и вертикали — не менее 0,30 м']
+  ]);
+  H += '<p class="ni"><small>Значения приведены как нормативные требования для проверки в проектной документации; фактические габариты и расстояния — по результатам измерений (приложение Г).</small></p>';
+  H += '<h2>3.5 Перечень задействованных опор</h2>';
+  H += '<p class="ni">Перечень опор, входящих в границы запроса, с указанием марки, материала, типа, длины пролёта, выявленных дефектов и категории технического состояния по ГОСТ 31937-2024 приведён в приложении Б' +
+    (d.total ? ' (' + d.total + ' поз.)' : '') + '.</p>';
+  H += '<h2>3.6 Схема размещения объекта инфраструктуры</h2>';
+  H += '<p class="ni">Ситуационный план прохождения трассы с нанесением номеров опор и границ запрашиваемого участка приведён в приложении А.</p>';
+  H += '<h2>3.7 Сведения о размещаемой сети электросвязи (по данным пользователя инфраструктуры)</h2>';
+  H += dataTable(S.cables, [
+    {h:'№', k:'№ п/п', n:true, f:(r,i)=> r['№ п/п'] || (i+1)},
+    {h:'Марка', k:'Марка (из «Спр_Кабели»)'},
+    {h:'Тип элемента сети электросвязи', k:'Тип элемента сети электросвязи'},
+    {h:'Диаметр, мм', k:'Наружный диаметр, мм', n:true},
+    {h:'Масса, кг/км', k:'Погонная масса, кг/км', n:true},
+    {h:'Допустимое тяжение, кН', k:'Допустимое тяжение, кН', n:true},
+    {h:'Монтажное тяжение, кН', k:'Монтажное тяжение, кН', n:true},
+    {h:'Высота подвеса, м', k:'Высота подвеса, м', n:true},
+    {h:'Класс напряжения', k:'Класс напряжения размещения, кВ'},
+    {h:'Линейная арматура', k:'Линейная арматура'}
+  ], [3,12,20,7,8,9,9,8,10,14], 'Лист «Кабели» файла исходных данных не заполнен.');
+  if (d.kvList.length > 1)
+    H += '<p class="ni">Объект включает несколько классов напряжения, для которых нормируемые габариты различаются. Размещаемые элементы сети электросвязи закреплены за классами напряжения; оценка несущей способности (раздел 5, приложение Ж) по каждой опоре выполнена применительно к элементам её класса напряжения.</p>';
+  if (S.cables.length > 1)
+    H += '<p class="ni">Оценка технологической возможности (раздел 5, приложение Ж) выполнена применительно к одновременному размещению всех перечисленных элементов.</p>';
+
+  /* ---- 4 ---- */
+  H += '<h1>4 Работы по осмотру, измерению и обследованию объекта инфраструктуры</h1>';
+  H += '<h2>4.1 Сроки и методы</h2>';
+  H += tblKV([
+    ['Техническое задание', F('ТЗ_НОМЕР') + ' от ' + F('ТЗ_ДАТА')],
+    ['Программа работ', F('ПРОГРАММА_НОМЕР') + ' от ' + F('ПРОГРАММА_ДАТА')],
+    ['Период выполнения работ', 'с ' + F('РАБОТЫ_НАЧАЛО') + ' по ' + F('РАБОТЫ_ОКОНЧАНИЕ')],
+    ['Применённые методы', F('РАБОТЫ_МЕТОДЫ')],
+    ['Состав исполнителей', F('ИСПОЛНИТЕЛЬ_СОСТАВ')],
+    ['Наряд-допуск / распоряжение', F('НАРЯД_РЕКВИЗИТЫ')],
+    ['Схема производства работ', F('СХЕМА_РАБОТ')],
+    ['Выборка при измерении сопротивления заземления', F('ЗАЗЕМ_ВЫБОРКА')]
+  ]);
+  /* Формулировка следует за фактически выбранной схемой производства работ:
+     наряд-допуск — для работ по наряду-допуску, распоряжение — для работ по
+     распоряжению. Прежний безусловный текст про бригаду не менее двух
+     работников противоречил бы отчёту, где осмотр вёл один работник. */
+  (function(){
+    var sch = String(F('СХЕМА_РАБОТ') || '');
+    var crewN = String(F('ИСПОЛНИТЕЛЬ_СОСТАВ') || '').split(/[;\n]/).filter(function(x){ return x.trim(); }).length;
+    var docTxt = /по распоряжению/.test(sch) ? 'с оформлением распоряжения'
+               : (/по наряду-допуску/.test(sch) ? 'с оформлением наряда-допуска'
+               : 'с оформлением организационных мероприятий');
+    var whoTxt = crewN === 1 ? 'работником' : 'работниками в составе ' + crewN + ' чел.';
+    H += '<p class="ni"><small>Работы выполнены ' + whoTxt + ' ' + docTxt +
+      ' по схеме «' + esc(sch || 'не указана') + '» в соответствии с Правилами по охране труда при эксплуатации ' +
+      'электроустановок, утв. приказом Минтруда России от 15.12.2020 № 903н.</small></p>';
+  })();
+  H += '<h2>4.2 Применённые средства измерений</h2>';
+  H += '<p class="ni">Перечень средств измерений с заводскими номерами и сведениями о поверке, включая номера записей о поверке во ФГИС «Аршин», приведён в приложении Д. Все применённые средства измерений на дату выполнения работ имели действующую поверку.</p>';
+  H += '<h2>4.3 Результаты осмотра</h2>';
+  H += '<p class="ni">Ведомость выявленных дефектов с указанием категории дефекта и категории технического состояния конструкций по ГОСТ 31937-2024, а также фотоматериалы приведены в приложении В. Дефекты выявлены на ' +
+    d.defects.length + ' ' + plural(d.defects.length, 'опоре', 'опорах', 'опорах') +
+    ', в том числе категории A — ' + d.catA + ', категории Б — ' + d.catB + ', категории В — ' + d.catV + '.</p>';
+  H += '<p class="ni">Сводные результаты осмотра:</p>';
+  H += '<table class="t"><colgroup><col style="width:46%"><col style="width:16%"><col style="width:38%"></colgroup>' +
+    '<thead><tr><th>Категория технического состояния (ГОСТ 31937-2024)</th><th>Опор, шт.</th><th>Влияние на возможность размещения</th></tr></thead><tbody>' +
+    '<tr><td>Нормативное (работоспособное) — дефектов не выявлено</td><td class="n">' + (d.cntOk - d.catV) + '</td><td>Размещение возможно без дополнительных условий</td></tr>' +
+    '<tr><td>Работоспособное — малозначительные повреждения (категория В)</td><td class="n">' + d.catV + '</td><td>Размещение возможно без дополнительных условий</td></tr>' +
+    '<tr><td>Ограниченно работоспособное</td><td class="n">' + d.cntLim + '</td><td>Размещение возможно после выполнения мероприятий раздела 6</td></tr>' +
+    '<tr><td>Аварийное</td><td class="n">' + d.cntBad + '</td><td>Размещение не допускается до восстановления несущей способности</td></tr>' +
+    '<tr><td><b>ИТОГО</b></td><td class="n"><b>' + d.total + '</b></td><td>—</td></tr></tbody></table>';
+  H += '<h2>4.4 Результаты измерений</h2>';
+  H += '<p class="ni">Протоколы разделены на две части. В приложении Г.1 приведены результаты инструментальных измерений фактического состояния конструкций' +
+    (d.measG1.length ? ' (' + d.measG1.length + ' ' + plural(d.measG1.length, 'измерение', 'измерения', 'измерений') + ')' : '') +
+    '. В приложении Г.2 приведена оценка достаточности фактически свободных интервалов под размещение оптического кабеля' +
+    (d.measG2.length ? ' (' + d.measG2.length + ' ' + plural(d.measG2.length, 'позиция', 'позиции', 'позиций') + ')' : '') + '.</p>';
+  H += '<p class="ni"><small>Размещаемый кабель на дату обследования не смонтирован, поэтому величины приложения Г.2 являются не измерениями кабеля, а фактически свободными интервалами; вывод по ним даётся в форме «достаточно / недостаточно». Окончательные габариты и расстояния с учётом стрел провеса, высот и точек подвеса определяются проектной документацией.</small></p>';
+
+  /* ---- 5 ---- */
+  H += '<h1>5 Наличие (отсутствие) технологической возможности предоставления доступа</h1>';
+  H += '<p class="sec-note">Раздел содержит информацию, предусмотренную подпунктом «б» пункта 13 Правил.</p>';
+  H += '<h2>5.1 Критерии оценки</h2>';
+  H += '<p class="ni">Технологическая возможность оценивалась исходя из определения, приведённого в пункте 2 Правил, и условия абзаца второго пункта 18 Правил: размещение сети электросвязи не должно препятствовать использованию объекта инфраструктуры по прямому назначению и должно обеспечивать безопасность его функционирования. Применены критерии:</p><ul>' +
+    '<li>соответствие опор дополнительным нагрузкам от размещаемой сети электросвязи (собственный вес, гололёдная и ветровая нагрузки, тяжение);</li>' +
+    '<li>сохранение нормируемых габаритов до земли, пересекаемых объектов и насаждений (ПУЭ-7, глава 2.5);</li>' +
+    '<li>сохранение нормируемых изоляционных расстояний до токоведущих частей;</li>' +
+    '<li>фактическое техническое состояние несущих конструкций по результатам осмотра и измерений;</li>' +
+    '<li>наличие свободного места с учётом ранее размещённых элементов сетей электросвязи.</li></ul>';
+  H += '<h2>5.2 Предварительная оценка соответствия дополнительным нагрузкам</h2>';
+  H += '<p class="ni">' + ed('edLoad', loadText(d)) + '</p>';
+  H += '<p class="ni"><small>Оценка носит предварительный (рекомендательный) характер. Поверочный расчёт суммарных нагрузок на каждую опору выполняется в проектной документации пользователя инфраструктуры по ПУЭ-7 (глава 2.5), СП 20.13330.2016 и типовому проекту (паспорту) опоры — пункт 6 ТТ № 282р.</small></p>';
+  if (la && la.rows.length){
+    const worstTxt = (la.worst === null) ? '' :
+      ' Минимальный запас по изгибающему моменту составляет ' + la.worst.toFixed(1).replace('.', ',') + ' %.';
+    H += '<p class="ni">Количественная сопоставительная оценка несущей способности опор по методике главы 2.5 ПУЭ-7 приведена в приложении Ж.' + worstTxt + '</p>';
+    if (la.noQuant.length){
+      const mk = [...new Set(la.noQuant.map(r => r.mark))];
+      H += '<p class="ni">По опорам марок ' + esc(mk.join(', ')) + ' количественная оценка запаса не приводится. Это анкерные, угловые, концевые и ответвительные опоры: они воспринимают неуравновешенное тяжение и работают совместно с подкосами, оттяжками и второй стойкой, которые упрощённая расчётная схема не описывает. Поверочный расчёт по расчётной схеме опоры включён в приложение Е.1 как мероприятие проектной документации (пункт 6 ТТ № 282р).</p>';
+    }
+    if (d.overSpans.length)
+      H += '<p class="ni">На ' + d.overSpans.length + ' ' + plural(d.overSpans.length, 'опоре', 'опорах', 'опорах') +
+        ' фактический пролёт превышает габаритный по типовому проекту. Оценка выполнена по наибольшему пролёту в пределах марки; поверочный расчёт по этим опорам включён в приложение Е.1.</p>';
+  }
+  H += '<h2>5.3 Оценка соблюдения габаритов и расстояний</h2>';
+  H += '<p class="ni">' + ed('edClear', clearanceText(d)) + '</p>';
+  H += '<p class="ni"><small>Окончательное подтверждение габаритов и расстояний (с учётом стрел провеса, высот и точек подвеса) выполняется в проектной документации — ТТ № 282р раздел 3, ПУЭ-7 глава 2.5.</small></p>';
+  H += '<h2>5.4 Сводный результат по опорам</h2>';
+  H += '<table class="t"><colgroup><col style="width:52%"><col style="width:24%"><col style="width:24%"></colgroup>' +
+    '<thead><tr><th>Технологическая возможность</th><th>Опор, шт.</th><th>Доля, %</th></tr></thead><tbody>' +
+    '<tr><td>Имеется</td><td class="n">' + d.tvYes + '</td><td class="n">' + d.pYes + '</td></tr>' +
+    '<tr><td>Имеется при условии выполнения мероприятий</td><td class="n">' + d.tvCond + '</td><td class="n">' + d.pCond + '</td></tr>' +
+    '<tr><td>Отсутствует</td><td class="n">' + d.tvNo + '</td><td class="n">' + d.pNo + '</td></tr>' +
+    '<tr><td><b>ИТОГО</b></td><td class="n"><b>' + d.total + '</b></td><td class="n">' + (d.total ? '100' : '0') + '</td></tr></tbody></table>';
+  H += '<p class="ni">Пообъектная разбивка приведена в приложении Б (графа «Технологическая возможность»).</p>';
+  H += '<h2>5.5 Вывод о технологической возможности</h2>';
+  H += '<p class="ni">' + ed('edConcl', conclusionText(d)) + '</p>';
+  H += '<table class="t"><colgroup><col style="width:52%"><col style="width:48%"></colgroup>' +
+    '<thead><tr><th>Вывод согласован</th><th>Подпись, дата</th></tr></thead><tbody>' +
+    '<tr><td>' + F('СОГЛАС_ДОЛЖ') + ', ' + F('СОГЛАС_ФИО') + '</td><td>_______________ «____» ____________ ' + d.year + ' г.</td></tr></tbody></table>';
+  if (d.cntBad > 0){
+    H += '<h2>5.6 Опоры в аварийном состоянии — эксплуатационное событие</h2>';
+    H += '<p class="ni">Выявлено опор в аварийном состоянии — ' + d.cntBad + ' шт. Независимо от рассмотрения заявления о предоставлении доступа сведения о них переданы в эксплуатирующее подразделение владельца инфраструктуры для принятия мер в порядке Правил технической эксплуатации: ' + F('АВАРИЙНЫЕ_ПЕРЕДАНЫ') + '.</p>';
+  }
+
+  /* ---- 6 ---- */
+  H += '<h1>6 Порядок выполнения технологических, технических и иных мероприятий</h1>';
+  H += '<p class="sec-note">Раздел содержит информацию, предусмотренную подпунктом «в» пункта 13 Правил.</p>';
+  H += '<p class="ni"><b>Мероприятия, приведённые в настоящем разделе, носят рекомендательный характер.</b> Их состав, объём, технические решения и стоимость определяются проектной документацией пользователя инфраструктуры и согласуются с владельцем инфраструктуры (пункты 5.1, 6 ТТ № 282р). Отчёт фиксирует лишь факт необходимости мероприятия по результатам осмотра и измерений.</p>';
+  H += '<h2>6.1 Перечень мероприятий и распределение обязанностей</h2>';
+  H += '<p class="ni">Перечень мероприятий, необходимость которых выявлена по результатам осмотра и измерений, приведён в приложении Е и разделён на две группы:</p><ul>' +
+    '<li><b>Е.1 — мероприятия, обусловленные размещением сети электросвязи</b>' +
+    (d.actsE1.length ? ' (' + d.actsE1.length + ' поз.)' : ' (не требуются)') +
+    '. Исполнитель — пользователь инфраструктуры. Сюда отнесены проектные решения по обеспечению нормируемых расстояний и поверочные расчёты в составе проектной документации;</li>' +
+    '<li><b>Е.2 — устранение дефектов</b>' +
+    (d.actsE2.length ? ' (' + d.actsE2.length + ' поз.)' : ' (не требуются)') +
+    '. Сюда отнесены дефекты несущих конструкций и несоответствия фактического состояния.</li></ul>';
+  /* Оговорка о недопустимости возложения эксплуатационных дефектов на
+     пользователя приводится тогда, когда отчёт этого и не делает. Если по
+     группе Е.2 исполнителем назначен пользователь инфраструктуры, абзац
+     противоречил бы самой таблице, поэтому вместо него даётся отсылка
+     к договору (пункт 26 Правил). */
+  const e2ToUser = d.actsE2.filter(r => /пользовател/i.test(String(r['Исполнитель'] || ''))).length;
+  H += e2ToUser
+    ? '<p class="ni">Распределение обязанностей по выполнению мероприятий группы Е.2 определяется договором о предоставлении доступа к инфраструктуре (пункт 26 Правил). По ' + e2ToUser + ' поз. исполнителем определён пользователь инфраструктуры.</p>'
+    : '<p class="ni">Основание разделения: содержание принадлежащего владельцу имущества является его обязанностью (статья 210 Гражданского кодекса Российской Федерации, Правила технической эксплуатации). Отнесение устранения ранее возникших эксплуатационных дефектов на пользователя инфраструктуры в качестве условия предоставления доступа образует признаки навязывания невыгодных условий договора (часть 1 статьи 10 Федерального закона от 26.07.2006 № 135-ФЗ «О защите конкуренции») и настоящим отчётом не производится.</p>';
+  H += '<h2>6.2 Последовательность выполнения</h2><ol style="text-indent:0">' +
+    '<li>Заключение договора о предоставлении доступа к инфраструктуре (пункты 19, 23, 26 Правил).</li>' +
+    '<li>Выполнение мероприятий, отнесённых приложением Е — до начала работ по размещению.</li>' +
+    '<li>Разработка пользователем инфраструктуры проектной документации и её согласование с владельцем инфраструктуры.</li>' +
+    '<li>Согласование графика производства работ и режимов работы объекта инфраструктуры (технологические отключения).</li>' +
+    '<li>Производство работ по размещению сети электросвязи.</li>' +
+    '<li>Приёмка размещённых элементов сети электросвязи с оформлением акта.</li></ol>';
+  H += '<h2>6.3 Условия производства работ на объекте инфраструктуры</h2><ul>' +
+    '<li>работы в охранной зоне и на конструкциях объекта инфраструктуры производятся по наряду-допуску;</li>' +
+    '<li>работы, требующие снятия напряжения, выполняются по согласованному графику технологических отключений;</li>' +
+    '<li>изменение конструкции опор, установка дополнительных элементов и сверление несущих конструкций без письменного согласования с владельцем инфраструктуры не допускаются;</li>' +
+    '<li>точки крепления, тип узлов подвеса и линейной арматуры подлежат согласованию с владельцем инфраструктуры на стадии проектной документации;</li>' +
+    '<li>после завершения работ пользователь инфраструктуры обеспечивает восстановление нарушенного благоустройства и вывоз отходов.</li></ul>';
+
+  /* ---- 7 ---- */
+  H += '<h1>7 Порядок формирования цены (тарифа) на предоставление доступа</h1>';
+  H += '<p class="sec-note">Раздел содержит информацию, предусмотренную подпунктом «г» пункта 13 Правил.</p>';
+  H += '<p class="ni">7.1 Цена (тариф) на предоставление доступа устанавливается владельцем инфраструктуры в соответствии с пунктами 38–41 Правил и с учётом методических рекомендаций Федеральной антимонопольной службы. Порядок формирования цены (тарифа) опубликован в порядке, предусмотренном разделом III Правил.</p>';
+  H += tblKV([
+    ['Адрес публикации порядка формирования цены (тарифа)', F('ЦЕНА_ПУБЛИКАЦИЯ')],
+    ['Документ об утверждении прейскуранта', F('ПРЕЙСКУРАНТ')],
+    ['Стоимость работ по осмотру, измерению, обследованию (пункт 16 Правил)', F('ЦЕНА_РАБОТЫ') + ' руб. с НДС'],
+    ['Дата оплаты работ', F('ОПЛАТА_ДАТА')]
+  ]);
+  H += '<p class="ni">7.2 В цену (тариф) включаются экономически обоснованные расходы владельца инфраструктуры, предусмотренные пунктом 39 Правил.</p>';
+  H += '<p class="ni">7.3 Цены (тарифы) в сопоставимых условиях устанавливаются равными для всех пользователей инфраструктуры (пункт 38 Правил). Включение в цену расходов, учтённых в составе цен на иные услуги с использованием тех же объектов, не допускается.</p>';
+
+  /* ---- 8 ---- */
+  H += '<h1>8 Условия доступа сотрудников пользователя инфраструктуры</h1>';
+  H += '<p class="sec-note">Раздел содержит информацию, предусмотренную подпунктом «д» пункта 13 Правил.</p>';
+  H += '<p class="ni">8.1 Владелец инфраструктуры обеспечивает на безвозмездной основе беспрепятственный доступ уполномоченного персонала пользователя инфраструктуры к размещённой сети электросвязи и её отдельным элементам (подпункт «в» пункта 30 Правил).</p>';
+  H += '<p class="ni">8.2 Условия доступа: ' + F('ДОСТУП_УСЛОВИЯ') + '</p>';
+  H += '<p class="ni">8.3 При возникновении аварийной ситуации на сети электросвязи доступ обеспечивается в круглосуточном режиме по заявке в диспетчерскую службу владельца инфраструктуры с последующим оформлением документов в рабочем порядке.</p>';
+  H += '<p class="ni">8.4 Размещение элементов сети электросвязи и последующий доступ к ним не могут быть обусловлены приобретением пользователем инфраструктуры иных работ и услуг владельца инфраструктуры (абзац третий пункта 18 Правил).</p>';
+
+  /* ---- 9 ---- */
+  H += '<h1>9 Заключение</h1>';
+  H += '<p class="ni">9.1 Работы по осмотру, измерению и обследованию объекта инфраструктуры ' + objName +
+    ' выполнены в объёме, необходимом и достаточном для предоставления информации, предусмотренной подпунктами «а»–«д» пункта 13 Правил.</p>';
+  H += '<p class="ni">9.2 Обследовано опор — ' + d.total + ' шт., в том числе в нормативном (работоспособном) состоянии — ' +
+    d.cntOk + ' шт., в ограниченно работоспособном — ' + d.cntLim + ' шт., в аварийном — ' + d.cntBad + ' шт. ' +
+    'Дефекты выявлены на ' + d.defects.length + ' ' + plural(d.defects.length, 'опоре', 'опорах', 'опорах') +
+    ': категории A — ' + d.catA + ', категории Б — ' + d.catB + ', категории В — ' + d.catV + '.</p>';
+  H += '<p class="ni">9.3 Итоговый вывод о наличии (отсутствии) технологической возможности предоставления доступа: ' + ed('edConcl2', conclusionText(d)) + '</p>';
+  H += '<p class="ni">9.4 Перечень мероприятий, необходимых для предоставления доступа, приведён в приложении Е; всего мероприятий — ' + S.acts.length +
+    ', в том числе группы Е.1 (пользователь инфраструктуры) — ' + d.actsE1.length +
+    ', группы Е.2 (владелец инфраструктуры) — ' + d.actsE2.length + '.</p>';
+  H += '<p class="ni">9.5 Настоящий отчёт является ответом владельца инфраструктуры на запрос пользователя инфраструктуры и не является офертой на заключение договора о предоставлении доступа. Оферта либо мотивированный отказ направляются в порядке пункта 23 Правил по результатам рассмотрения заявления, предусмотренного пунктом 20 Правил.</p>';
+  H += '<p class="ni">9.6 Отчёт составлен по результатам обследования объекта инфраструктуры в целях рассмотрения заявления о предоставлении доступа и <b>не является</b> результатом инженерных изысканий в значении статьи 47 Градостроительного кодекса Российской Федерации, проектной документацией в значении статьи 48 Градостроительного кодекса Российской Федерации и Положения, утв. постановлением Правительства Российской Федерации от 16.02.2008 № 87, а также заключением об обследовании технического состояния строительных конструкций. Результаты отчёта являются исходными данными для разработки проектной документации и не могут быть использованы для производства строительно-монтажных работ. Фактические данные приведены по состоянию на дату проведения осмотра; выводы действительны применительно к оптическому кабелю с характеристиками, указанными в подразделе 3.7, и при неизменности схемы и состава размещённых на объекте элементов.</p>';
+
+  /* ---- 10 ---- */
+  H += '<h1>10 Перечень применённых нормативных документов</h1><ol style="text-indent:0">' +
+    '<li>Федеральный закон от 26.07.2006 № 135-ФЗ «О защите конкуренции», часть 3 статьи 10.</li>' +
+    '<li>Федеральный закон от 07.07.2003 № 126-ФЗ «О связи».</li>' +
+    '<li>Федеральный закон от 30.12.2009 № 384-ФЗ «Технический регламент о безопасности зданий и сооружений».</li>' +
+    '<li>Правила недискриминационного доступа к инфраструктуре для размещения сетей электросвязи, утв. постановлением Правительства Российской Федерации от 22.11.2022 № 2106 (в ред. от 12.06.2024 № 792).</li>' +
+    '<li>Правила установления охранных зон объектов электросетевого хозяйства, утв. постановлением Правительства Российской Федерации от 24.02.2009 № 160.</li>' +
+    '<li>Правила технической эксплуатации электрических станций и сетей Российской Федерации, утв. приказом Минэнерго России от 04.10.2022 № 1070 (в действующей редакции).</li>' +
+    '<li>Технические требования к размещению сетей электросвязи (их отдельных элементов) сторонних лиц на ВЛ, утв. распоряжением ПАО «Россети» от 18.05.2026 № 282р (в действующей редакции).</li>' +
+    '<li>Правила по охране труда при эксплуатации электроустановок, утв. приказом Минтруда России от 15.12.2020 № 903н.</li>' +
+    '<li>Правила устройства электроустановок, седьмое издание, глава 2.5.</li>' +
+    '<li>ГОСТ 31937-2024 «Здания и сооружения. Правила обследования и мониторинга технического состояния».</li>' +
+    '<li>ГОСТ 27751-2014 «Надёжность строительных конструкций и оснований. Основные положения».</li>' +
+    '<li>ГОСТ 22690-2015 «Бетоны. Определение прочности механическими методами неразрушающего контроля».</li>' +
+    '<li>СП 20.13330.2016 «Нагрузки и воздействия».</li>' +
+    '<li>СП 14.13330.2018 «Строительство в сейсмических районах».</li>' +
+    '<li>СП 131.13330.2020 «Строительная климатология».</li>' +
+    '<li>Порядок проведения поверки средств измерений, утв. приказом Минпромторга России от 31.07.2020 № 2510.</li>' +
+    '<li>Правила проектирования, строительства и эксплуатации волоконно-оптических линий связи на воздушных линиях электропередачи напряжением 0,4–35 кВ (утв. Минэнерго России и Минсвязи России, 2002).</li></ol>';
+
+  /* ---- Приложение А ---- */
+  H += '<h1 class="pb">Приложение А — Схема размещения объекта инфраструктуры</h1>';
+  if (S.schemes.length){
+    S.schemes.forEach((sc, i) => {
+      H += '<p class="fig"><img src="' + sc.src + '" data-w="' + (sc.w || 1200) + '" data-h="' + (sc.h || 800) + '" alt="Ситуационный план"></p>';
+      H += '<p class="fig-cap">Рисунок А.' + (i+1) + ' — <span class="edit" contenteditable="true">Ситуационный план прохождения ' +
+        (raw('ОБЪЕКТ_НАИМ') ? esc(raw('ОБЪЕКТ_НАИМ')) : 'объекта') + (S.schemes.length > 1 ? ' (лист ' + (i+1) + ')' : '') +
+        ' с нанесением номеров опор и границ запрашиваемого участка</span></p>';
+    });
+  } else {
+    H += '<p class="empty-note">Схема не загружена. Кнопка «Схема размещения → приложение А» на панели слева (изображения или документы ПДФ, можно несколько файлов).</p>';
+  }
+
+  /* ---- Приложение Б ---- */
+  H += '<h1 class="pb land">Приложение Б — Перечень задействованных опор</h1>';
+  H += dataTable(S.poles, [
+    {h:'№', k:'№ п/п', n:true, f:(r,i)=> r['№ п/п'] || (i+1)},
+    {h:'Линия (фидер)', k:'Линия / фидер'},
+    {h:'№ опоры', k:'№ опоры', n:true},
+    {h:'Класс, кВ', k:'Класс напряжения опоры', n:true},
+    {h:'Марка', k:'Марка опоры', n:true},
+    {h:'Материал', k:'Материал'},
+    {h:'Тип по назначению', k:'Тип по назначению'},
+    {h:'Смежная опора (пред.)', k:'', n:true, f:r => r.__prevNum || ''},
+    {h:'Пролёт до пред., м', k:'', n:true, f:r => r.__lPrev},
+    {h:'Смежная опора (след.)', k:'', n:true, f:r => r.__nextNum || ''},
+    {h:'Пролёт до след., м', k:'', n:true, f:r => r.__endPole ? 'конец участка' : r.__lNext},
+    {h:'Расч. пролёт, м', k:'', n:true, f:r => r.__lw},
+    {h:'Габарит. пролёт, м', k:'', n:true, f:r => { const rf = PPO.poleByMark(String(r['Марка опоры']||'').trim()); return rf ? rf.lgab : ''; }},
+    {h:'Местность', k:'Характер местности'},
+    {h:'Габарит норм., м', k:'', n:true, f:r => gabOf(r, d)},
+    {h:'Ранее размещ. ОК', k:'Ранее размещённые ОК — владелец'},
+    {h:'Дефект', k:'Дефект'},
+    {h:'Кат.', k:'Категория дефекта', n:true},
+    {h:'Состояние (ГОСТ 31937-2024)', k:'Состояние конструкции (ГОСТ 31937-2024)'},
+    {h:'Технол. возможность', k:'Технологическая возможность'},
+    {h:'Мероприятие', k:'Мероприятие'},
+    {h:'Широта', k:'Широта', n:true},
+    {h:'Долгота', k:'Долгота', n:true}
+  ], [3,7,4,3,5,5,6,4,4,4,4,4,4,5,4,6,9,3,8,7,7,5,5], 'Лист «Опоры» не заполнен или файл исходных данных не загружен.');
+  if (S.poles.length)
+    H += '<p class="ni"><small>Нормируемый габарит проводов до земли принят по таблицам 2.5.20/2.5.22 ПУЭ-7 раздельно по классу напряжения и характеру местности каждой опоры; фактические габариты — по результатам измерений (приложение Г.1). Габаритный пролёт приведён по типовому проекту опоры: превышение фактическим пролётом габаритного отражено в приложении Е.1.</small></p>' +
+      '<p class="ni"><small>По каждой опоре указаны смежные опоры и оба примыкающих пролёта. Расчётный пролёт — полусумма смежных пролётов (ветровой пролёт); для концевой опоры цепи и опоры ответвления, у которых один смежный пролёт, — его половина. Расчётный пролёт использован в оценке несущей способности (приложение Ж).</small></p>';
+
+  /* ---- Приложение В ---- */
+  H += '<h1 class="pb">Приложение В — Ведомость дефектов и фотоматериалы</h1>';
+  H += dataTable(d.defects, [
+    {h:'№', k:'', n:true, f:(r,i)=> i+1},
+    {h:'Линия (фидер)', k:'Линия / фидер'},
+    {h:'№ опоры', k:'№ опоры', n:true},
+    {h:'Марка', k:'Марка опоры', n:true},
+    {h:'Описание дефекта', k:'Дефект', f:r => defDescr(r)},
+    {h:'Категория дефекта', k:'', n:true, f:r => NC(r['Категория дефекта'])},
+    {h:'Состояние конструкции (ГОСТ 31937-2024)', k:'Состояние конструкции (ГОСТ 31937-2024)'},
+    {h:'Примечание', k:'Примечание', f:r => defNote(r)}
+  ], [4,12,7,7,28,7,20,15], S.poles.length
+       ? 'При осмотре дефектов несущих конструкций не выявлено.'
+       : 'Перечень опор не сформирован.');
+  if (S.photos.length){
+    S.photos.forEach((ph, i) => {
+      H += '<p class="fig"><img src="' + ph.src + '" data-w="' + (ph.w || 1200) + '" data-h="' + (ph.h || 800) + '" alt=""></p>';
+      H += '<p class="fig-cap">Рисунок В.' + (i+1) + ' — <span class="edit" contenteditable="true">' + esc(ph.name) + '</span></p>';
+    });
+  } else {
+    H += '<p class="ni">Фотоматериалы к настоящему приложению не прилагаются.</p>';
+  }
+
+  /* ---- Приложение Г ---- */
+  H += '<h1 class="pb land">Приложение Г.1 — Протоколы измерений фактического состояния</h1>';
+  H += dataTable(d.measG1, [
+    {h:'№', k:'', n:true, f:(r,i)=> i+1},
+    {h:'№ опоры', k:'№ опоры', n:true},
+    {h:'Линия (фидер)', k:'Линия / фидер'},
+    {h:'Вид измерения', k:'Вид измерения'},
+    {h:'Место (отметка)', k:'Место (отметка), м', n:true},
+    {h:'Значение', k:'Значение', n:true},
+    {h:'Ед. изм.', k:'Ед. изм.', n:true},
+    {h:'Нормативное требование', k:'Нормативное требование'},
+    {h:'Вывод', k:'Вывод'},
+    {h:'Средство измерения', k:'Средство измерения'}
+  ], [4,7,12,19,9,7,5,20,8,9], 'Измерений фактического состояния не выполнялось.');
+  H += '<p class="ni"><small>Каждая строка протокола относится к одной конкретной опоре. Значения, полученные на одной опоре, на другие опоры не распространяются.</small></p>';
+
+  H += '<h1 class="pb land">Приложение Г.2 — Оценка достаточности свободных интервалов под размещение</h1>';
+  H += '<p class="ni">Размещаемый оптический кабель на дату обследования не смонтирован. В настоящем приложении приведены фактически свободные интервалы, установленные на опорах, и их сопоставление с нормируемыми значениями. Вывод даётся в форме «достаточно / недостаточно» и не является измерением параметров кабеля.</p>';
+  H += dataTable(d.measG2, [
+    {h:'№', k:'', n:true, f:(r,i)=> i+1},
+    {h:'№ опоры', k:'№ опоры', n:true},
+    {h:'Линия (фидер)', k:'Линия / фидер'},
+    {h:'Проверяемый интервал', k:'Вид измерения'},
+    {h:'Место', k:'Место (отметка), м', n:true},
+    {h:'Фактически свободно', k:'Значение', n:true},
+    {h:'Ед. изм.', k:'Ед. изм.', n:true},
+    {h:'Нормируемое значение', k:'Нормативное требование'},
+    {h:'Вывод', k:'Вывод'},
+    {h:'Средство измерения', k:'Средство измерения'}
+  ], [4,7,12,19,7,9,5,20,8,9], 'Оценка достаточности интервалов не выполнялась.');
+  H += '<p class="ni"><small>Окончательное подтверждение габаритов и расстояний с учётом стрел провеса, высот и точек подвеса выполняется в проектной документации — раздел 3 ТТ № 282р, глава 2.5 ПУЭ-7.</small></p>';
+
+  /* ---- Приложение Д ---- */
+  H += '<h1 class="pb">Приложение Д — Сведения о применённых средствах измерений</h1>';
+  H += dataTable(S.si, [
+    {h:'№', k:'', n:true, f:(r,i)=> i+1},
+    {h:'Наименование средства измерения', k:'Наименование средства измерения'},
+    {h:'Тип / марка', k:'Тип / марка'},
+    {h:'Заводской №', k:'Заводской №', n:true},
+    {h:'№ записи о поверке во ФГИС «Аршин»', k:'№ записи о поверке во ФГИС «Аршин»'},
+    {h:'Дата поверки', k:'Дата поверки', n:true},
+    {h:'Действительна до', k:'Поверка действительна до', n:true}
+  ], [4,25,13,10,24,12,12], 'Лист «СИ» не заполнен.');
+  H += '<p class="ni"><small>Результаты поверки средств измерений подтверждаются сведениями, переданными во ФГИС «Аршин», в соответствии с Порядком проведения поверки средств измерений, утв. приказом Минпромторга России от 31.07.2020 № 2510.</small></p>';
+
+  /* ---- Приложение Е ---- */
+  const actCols = [
+    {h:'№', k:'', n:true, f:(r,i)=> i+1},
+    {h:'Линия (фидер)', k:'Линия / фидер'},
+    {h:'№ опоры', k:'№ опоры', n:true},
+    {h:'Мероприятие', k:'Мероприятие'},
+    {h:'Основание (дефект, несоответствие)', k:'Основание (дефект, несоответствие)'},
+    {h:'Исполнитель', k:'Исполнитель'},
+    {h:'Срок выполнения', k:'Срок выполнения'},
+    {h:'Ориентировочная стоимость, руб. с НДС', k:'Ориентировочная стоимость, руб. с НДС', n:true}
+  ];
+  const actW = [4,12,8,22,24,10,10,10];
+  /* Приложение Е.2 — тот же набор граф без «Исполнителя» */
+  const actColsE2 = actCols.filter(c => c.h !== 'Исполнитель');
+  const actWE2 = [4,13,9,25,26,11,12];
+  H += '<h1 class="pb land">Приложение Е.1 — Мероприятия, обусловленные размещением сети электросвязи</h1>';
+  H += '<p class="ni">Исполнитель — пользователь инфраструктуры. В группу включены проектные решения и поверочные расчёты, необходимость которых вызвана намерением разместить сеть электросвязи на объекте.</p>';
+  H += dataTable(d.actsE1, actCols, actW, 'Мероприятий, обусловленных размещением, не требуется.');
+
+  H += '<h1 class="pb land">Приложение Е.2 — Устранение дефектов</h1>';
+  H += '<p class="ni">В группу включены дефекты несущих конструкций и несоответствия фактического состояния.</p>';
+  /* Графа «Исполнитель» из этой таблицы исключена: распределение обязанностей
+     по группе Е.2 определяется договором о предоставлении доступа, а не
+     отчётом (пункт 26 Правил). */
+  H += dataTable(d.actsE2, actColsE2, actWE2, 'Дефектов, требующих устранения, не выявлено.');
+
+  /* ---- Приложение Ж ---- */
+  H += '<h1 class="pb">Приложение Ж — Оценка несущей способности опор</h1>';
+  if (la && la.rows.length){
+    H += '<h2>Ж.1 Методика</h2>';
+    H += '<p class="ni">Выполнена сопоставительная оценка по методу предельных состояний (первая группа) применительно к изгибающему моменту в заделке стойки. Погонные нагрузки на провода и кабели определены по пунктам 2.5.52 (ветровая), 2.5.53 (гололёдная) главы 2.5 ПУЭ-7; расчётные значения получены умножением на коэффициенты надёжности по пунктам 2.5.55, 2.5.62, 2.5.69.</p>';
+    H += '<p class="ni"><b>Допустимый момент принят по стойке опоры</b>, а не по её назначению: одна и та же стойка не может иметь разные допустимые моменты. Подкосы, вторая стойка и оттяжки анкерных опор в запас несущей способности не учитываются.</p>';
+    H += '<p class="ni"><b>Расчётным принят наибольший пролёт</b> в пределах марки опоры, а не средний: усреднение скрывает именно те опоры, которые определяют результат.' +
+      (la.rows.some(r => r.derated)
+        ? ' Для опор в ограниченно работоспособном состоянии дополнительно выполнен вариант расчёта с понижающим коэффициентом 0,8 к допустимому моменту — расчёт дефектной конструкции по паспортному значению недостоверен; расчётный пролёт в этом варианте принят по фактическим пролётам дефектных опор.'
+        : '') + '</p>';
+    H += '<p class="ni"><b>Количественный запас выдаётся только для промежуточных опор.</b> Анкерные, угловые, концевые и ответвительные опоры воспринимают неуравновешенное тяжение и работают совместно с подкосами, оттяжками и второй стойкой; упрощённая схема их не описывает, поэтому запас по ним не приводится, а поверочный расчёт по расчётной схеме относится к проектной документации. Справочно для таких опор приведён момент от тяжения: доля тяжения принята 1,0 для концевых и ответвительных, 2·sin(α/2) для угловых по фактическому углу поворота (при неизвестном угле — 1,0), 0,3 для анкерных промежуточных.</p>';
+    H += '<p class="ni"><b>Нагрузки учтены раздельно по классам напряжения.</b> На опору каждого класса отнесены только те провода, тросы и кабели, которые к этому классу относятся; элементы, помеченные как «все классы», учтены на всех опорах.</p>';
+    H += '<p class="ni">Принятые упрощения (в запас несущей способности): коэффициенты условий работы приняты равными единице (высота подвеса менее 25 м); коэффициент, учитывающий тип местности, принят для высоты до 15 м по типу местности «' + esc(raw('МЕСТНОСТЬ_ТИП') || 'В') + '»; ветер направлен под углом 90° к оси ВЛ; момент определён как произведение горизонтальной нагрузки на высоту подвеса. Оценка не заменяет поверочный расчёт по расчётной схеме опоры и является предварительной; поверочный расчёт выполняется в проектной документации (пункт 6 ТТ № 282р).</p>';
+    H += '<h2>Ж.2 Расчётные климатические параметры</h2>';
+    H += tblKV([
+      ['Нормативная толщина стенки гололёда', String(la.cl.be).replace('.', ',') + ' мм (район ' + esc(la.cl.iceD || raw('ГОЛОЛЁД_РАЙОН')) + ')'],
+      ['Нормативное ветровое давление', la.cl.w0 + ' Па (район ' + esc(la.cl.windD || raw('ВЕТЕР_РАЙОН')) + ')'],
+      ['Ветровое давление при гололёде', la.cl.wg + ' Па (п. 2.5.43 ПУЭ-7: 0,25 нормативного ветрового давления, для ВЛ до 20 кВ — не менее 200 Па)'],
+      ['Коэффициент, учитывающий тип местности', String(la.cl.kw).replace('.', ',')],
+      ['Коэффициенты надёжности', 'вес — 1,05; гололёд — ' + String(la.cl.gfIce).replace('.', ',') + '; ветер — 1,3']
+    ]);
+    H += '<h2>Ж.3 Учтённая существующая подвеска</h2>';
+    H += dataTable(S.loadWires, [
+      {h:'№', k:'', n:true, f:(r,i)=> i+1},
+      {h:'Марка провода / кабеля', k:'Марка провода / кабеля'},
+      {h:'Кол-во, шт.', k:'Количество (шт. в подвесе)', n:true},
+      {h:'Диаметр, мм', k:'Наружный диаметр, мм', n:true},
+      {h:'Масса, кг/км', k:'Погонная масса, кг/км', n:true},
+      {h:'Высота подвеса, м', k:'Высота подвеса, м', n:true},
+      {h:'Тяжение, кН', k:'Монтажное тяжение, кН', n:true},
+      {h:'Класс, кВ', k:'Класс напряжения, кВ'},
+      {h:'Принадлежность', k:'Принадлежность'}
+    ], [4,22,7,9,10,10,8,9,21], 'Существующая подвеска не задана (блок 2 листа «Нагрузки»).');
+    if (!S.loadWires.some(w => /провода ВЛ|грозотрос/i.test(String(w['Принадлежность'] || ''))))
+      H += '<p class="ni"><b>Внимание.</b> В составе учтённой подвески отсутствуют собственные провода ВЛ. Приведённые ниже значения запаса несущей способности не отражают фактическую нагрузку и подлежат подтверждению в проектной документации.</p>';
+    H += '<h2>Ж.4 Результаты оценки</h2>';
+    let jt = '<table class="t"><colgroup><col style="width:9%"><col style="width:11%"><col style="width:9%"><col style="width:8%"><col style="width:9%"><col style="width:10%"><col style="width:10%"><col style="width:9%"><col style="width:10%"><col style="width:15%"></colgroup>' +
+      '<thead><tr><th>Марка опоры</th><th>Стойка / типовой проект</th><th>Схема</th><th>Расч. пролёт, м</th>' +
+      '<th>M<sub>доп</sub>, кН·м</th><th>M от существующей подвески, кН·м</th><th>M от размещаемого кабеля, кН·м</th>' +
+      '<th>M от тяжения, кН·м</th><th>M суммарный, кН·м</th><th>Запас, %</th></tr></thead><tbody>';
+    la.rows.forEach(r => {
+      let res;
+      if (r.reserve === null)
+        res = r.tensioned ? 'не выдаётся' : '—';
+      else res = r.reserve.toFixed(1).replace('.', ',');
+      const nm = esc(r.mark) + (r.derated ? ' <small>(с дефектом Б, k=0,8)</small>' : '');
+      const at = r.derated ? (r.lwAtLim || '') : (r.lwAt || '');
+      jt += '<tr><td class="n">' + nm + '</td><td>' + esc((r.st ? r.st + ' / ' : '') + (r.proj || '—')) + '</td>' +
+        '<td>' + esc(r.sch || '—') + '</td>' +
+        '<td class="n">' + (r.Lw ? String(Math.round(r.Lw)) : '—') +
+          (at ? '<br><small>оп. ' + esc(at) + '</small>' : '') + '</td>' +
+        '<td class="n">' + (isNaN(r.Madm) ? '—' : r.Madm.toFixed(1).replace('.', ',')) + '</td>' +
+        '<td class="n">' + r.Mex.toFixed(2).replace('.', ',') + '</td>' +
+        '<td class="n">' + r.Mnew.toFixed(2).replace('.', ',') + '</td>' +
+        '<td class="n">' + (r.tUnknown ? 'н/д' : r.Mt.toFixed(2).replace('.', ',')) + '</td>' +
+        '<td class="n">' + (r.tUnknown ? '—' : r.Mtot.toFixed(2).replace('.', ',')) + '</td>' +
+        '<td class="n"><b>' + res + '</b></td></tr>';
+    });
+    jt += '</tbody></table>';
+    H += jt;
+    H += '<p class="ni"><small>Расчётный пролёт — наибольший ветровой пролёт в пределах марки опоры по данным приложения Б; ветровой пролёт опоры равен полусумме смежных пролётов, для концевой опоры цепи — половине единственного смежного. В графе указана опора, по которой принят расчётный пролёт. Расчётный режим — определяющий из «ветер без гололёда» и «ветер при гололёде на покрытые гололёдом провода». Запись «не выдаётся» означает, что опора воспринимает неуравновешенное тяжение и упрощённая сопоставительная оценка к ней неприменима; поверочный расчёт по расчётной схеме включён в приложение Е.1. Запись «н/д» в графе момента от тяжения означает, что монтажное тяжение при обследовании не устанавливалось.</small></p>';
+    const overRows = la.rows.filter(r => r.over > 0);
+    if (overRows.length)
+      H += '<p class="ni"><small>Опоры с фактическим пролётом свыше габаритного: ' +
+        overRows.map(r => esc(r.mark) + ' — ' + r.over + ' шт. (габаритный ' + r.lgab + ' м)').join('; ') + '.</small></p>';
+  } else {
+    H += '<p class="empty-note">Лист «Нагрузки» файла исходных данных не заполнен — количественная оценка не выполнялась. В этом случае вывод по подпункту «б» пункта 13 опирается на результаты осмотра и измерений, а необходимость поверочного расчёта отражается в приложении Е.</p>';
+  }
+
+  /* ---- Лист внутреннего контроля ---- */
+  /* Незаполненные места считаем по уже собранной разметке отчёта: так
+     проверка ловит любой прочерк, откуда бы он ни взялся, а не только те
+     реквизиты, что перечислены в списке обязательных. */
+  const nPH = (H.match(/class="fill"/g) || []).length;
+  audit.push({ grp:'I. Комплектность', name:'В отчёте не осталось незаполненных мест',
+    st: nPH ? 'fail' : 'ok',
+    note: nPH ? 'незаполненных реквизитов в тексте отчёта: ' + nPH +
+                ' — в документе они печатаются прочерками' : 'все реквизиты заполнены' });
+
+  LAST_AUDIT = audit;
+  H += '<h1 class="pb">Лист внутреннего контроля качества отчёта</h1>';
+  H += '<p class="ni">Контроль выполнен автоматизированно при формировании отчёта и подтверждён нормоконтролёром. Статусы: <b>соответствует</b> — требование выполнено; <b>внимание</b> — требуется проверка или пояснение; <b>несоответствие</b> — подлежит устранению до выпуска отчёта.</p>';
+  const stMap = { ok:'соответствует', warn:'ВНИМАНИЕ', fail:'НЕСООТВЕТСТВИЕ' };
+  let at = '<table class="t"><colgroup><col style="width:17%"><col style="width:33%"><col style="width:15%"><col style="width:35%"></colgroup>' +
+    '<thead><tr><th>Группа</th><th>Проверка</th><th>Статус</th><th>Примечание</th></tr></thead><tbody>';
+  audit.forEach(a => {
+    const color = a.st === 'fail' ? ' style="color:#A32B2B;font-weight:bold"' : (a.st === 'warn' ? ' style="color:#B26A00;font-weight:bold"' : '');
+    at += '<tr><td>' + esc(a.grp) + '</td><td>' + esc(a.name) + '</td><td class="n"' + color + '>' + stMap[a.st] + '</td><td>' + esc(a.note) + '</td></tr>';
+  });
+  at += '</tbody></table>';
+  H += at;
+  const nFail = audit.filter(a => a.st === 'fail').length, nWarn = audit.filter(a => a.st === 'warn').length;
+  H += '<p class="ni">Итог контроля: несоответствий — ' + nFail + ', замечаний — ' + nWarn + '. ' +
+    (nFail ? '<b>Выпуск отчёта до устранения несоответствий не допускается.</b>' : 'Отчёт допускается к выпуску' + (nWarn ? ' с учётом пояснений по замечаниям.' : '.')) + '</p>';
+  /* Если отчёт всё же выпускается при наличии несоответствий, решение об этом
+     печатается здесь и уходит в .docx вместе с отчётом. */
+  const rel = (typeof PPOAudit !== 'undefined' && PPOAudit.releaseDecision) ? PPOAudit.releaseDecision() : null;
+  if (rel && rel.reason){
+    H += '<table class="t"><colgroup><col style="width:30%"><col style="width:70%"></colgroup>' +
+      '<thead><tr><th>Решение о выпуске при наличии несоответствий</th><th>Содержание</th></tr></thead><tbody>' +
+      '<tr><td>Обоснование</td><td>' + esc(rel.reason) + '</td></tr>' +
+      '<tr><td>Решение принял</td><td>' + esc(rel.person) + '</td></tr>' +
+      '<tr><td>Дата решения</td><td>' + esc(rel.when) + '</td></tr>' +
+      '<tr><td>Несоответствий на дату решения</td><td>' + rel.fails + '</td></tr>' +
+      '</tbody></table>';
+  }
+  H += '<table class="t"><colgroup><col style="width:52%"><col style="width:48%"></colgroup>' +
+    '<thead><tr><th>Нормоконтроль / внутренний аудит</th><th>Подпись, дата</th></tr></thead><tbody>' +
+    '<tr><td>' + F('АУДИТОР_ДОЛЖ') + ', ' + F('АУДИТОР_ФИО') + '</td><td>_______________ «____» ____________ ' + d.year + ' г.</td></tr></tbody></table>';
+
+  /* ---- подписи ---- */
+  H += '<h1>Подписи</h1>';
+  H += '<table class="t"><colgroup><col style="width:52%"><col style="width:48%"></colgroup>' +
+    '<thead><tr><th>Должность</th><th>Подпись, Ф.И.О.</th></tr></thead><tbody>' +
+    '<tr><td>' + F('ПОДПИСАНТ_ДОЛЖ') + '</td><td>_______________ ' + F('ПОДПИСАНТ_ФИО') + '</td></tr>' +
+    '<tr><td>' + F('ИСПОЛНИТЕЛЬ_РУК') + '</td><td>_______________</td></tr></tbody></table>';
+  H += '<p class="ni">М.П.</p>';
+  H += '<p class="ni">Отчёт направлен пользователю инфраструктуры «____» _______________ ' + d.year + ' г. посредством ____________________ связи.</p>';
+
+  document.getElementById('doc').innerHTML = H;
+
+  /* синхронизация двух копий вывода 5.5 / 9.3 */
+  const a = document.getElementById('edConcl'), b2 = document.getElementById('edConcl2');
+  if (a && b2){
+    a.addEventListener('input', () => { b2.innerHTML = a.innerHTML; });
+    b2.addEventListener('input', () => { a.innerHTML = b2.innerHTML; });
+  }
+
+  /* сводка и полоса п.13 */
+  const rh = document.getElementById('rhNo');
+  if (rh) rh.textContent = (raw('ОТЧЁТ_НОМЕР') ? 'Отчёт ' + raw('ОТЧЁТ_НОМЕР') : '') +
+    (raw('ОТЧЁТ_ДАТА') ? ' от ' + raw('ОТЧЁТ_ДАТА') : '');
+  const rf = document.getElementById('rfTxt');
+  if (rf) rf.textContent = 'Отчёт по пункту 13 Правил недискриминационного доступа (ПП РФ № 2106)' +
+    (raw('ОБЪЕКТ_НАИМ') ? ' · ' + raw('ОБЪЕКТ_НАИМ') : '');
+
+  document.getElementById('statsBlock').style.display = d.total ? '' : 'none';
+  document.getElementById('stTotal').textContent = d.total;
+  document.getElementById('stYes').textContent = d.tvYes;
+  document.getElementById('stCond').textContent = d.tvCond;
+  document.getElementById('stNo').textContent = d.tvNo;
+
+  /* аудит-сводка на панели */
+  const aEl = document.getElementById('auditList');
+  if (aEl){
+    aEl.innerHTML = '';
+    const icon = { ok:'✓', warn:'!', fail:'✕' };
+    audit.forEach(a => {
+      const row = document.createElement('div');
+      row.className = 'arow ' + a.st;
+      row.innerHTML = '<b>' + icon[a.st] + '</b><span>' + esc(a.name) + '</span>';
+      row.title = a.note;
+      aEl.appendChild(row);
+    });
+    const nF = audit.filter(a => a.st === 'fail').length, nW = audit.filter(a => a.st === 'warn').length;
+    const sum = document.getElementById('auditSum');
+    sum.textContent = nF ? ('Несоответствий: ' + nF + ', замечаний: ' + nW) :
+      (nW ? ('Замечаний: ' + nW) : 'Все проверки пройдены');
+    sum.className = 'audit-sum ' + (nF ? 'fail' : (nW ? 'warn' : 'ok'));
+  }
+
+  const seg = (id, on) => document.getElementById(id).classList.toggle('on', !!on);
+  seg('sgA', d.total > 0 && !!raw('ОБЪЕКТ_НАИМ'));
+  seg('sgB', d.total > 0 && (d.tvYes + d.tvCond + d.tvNo) > 0);
+  seg('sgC', d.actsTotal > 0 || (d.total > 0 && d.tvCond === 0 && d.tvNo === 0));
+  seg('sgD', !!raw('ЦЕНА_РАБОТЫ'));
+  seg('sgE', !!raw('ДОСТУП_УСЛОВИЯ'));
+}
+
+/* ============================================================ ВЫГРУЗКА В WORD */
+/* ============================================================
+   ГЕНЕРАТОР .DOCX (OOXML) — без внешних библиотек
+   Разметка отчёта -> формат Ворд (OOXML) -> архив (метод без сжатия)
+   ============================================================ */
+
+/* ---------- ZIP (store, без сжатия) ---------- */
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let i = 0; i < 256; i++){
+    let c = i;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[i] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(buf){
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function zipStore(files){
+  const enc = new TextEncoder();
+  const chunks = [], central = [];
+  let offset = 0;
+  const u16 = v => [v & 0xFF, (v >>> 8) & 0xFF];
+  const u32 = v => [v & 0xFF, (v >>> 8) & 0xFF, (v >>> 16) & 0xFF, (v >>> 24) & 0xFF];
+  files.forEach(f => {
+    const name = enc.encode(f.name);
+    const data = (f.data instanceof Uint8Array) ? f.data : enc.encode(f.data);
+    const crc = crc32(data);
+    const lh = [].concat(u32(0x04034b50), u16(20), u16(0x0800), u16(0), u16(0), u16(0),
+      u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0));
+    chunks.push(new Uint8Array(lh), name, data);
+    const ch = [].concat(u32(0x02014b50), u16(20), u16(20), u16(0x0800), u16(0), u16(0), u16(0),
+      u32(crc), u32(data.length), u32(data.length), u16(name.length),
+      u16(0), u16(0), u16(0), u16(0), u32(0), u32(offset));
+    central.push(new Uint8Array(ch), name);
+    offset += lh.length + name.length + data.length;
+  });
+  let cdSize = 0;
+  central.forEach(c => cdSize += c.length);
+  const eocd = new Uint8Array([].concat(u32(0x06054b50), u16(0), u16(0),
+    u16(files.length), u16(files.length), u32(cdSize), u32(offset), u16(0)));
+  const all = chunks.concat(central, [eocd]);
+  let total = 0; all.forEach(a => total += a.length);
+  const out = new Uint8Array(total);
+  let p = 0; all.forEach(a => { out.set(a, p); p += a.length; });
+  return out;
+}
+
+/* ---------- вспомогательное ---------- */
+function xesc(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/\u00A0/g,' ');
+}
+const DOC_W = 9355;          // рабочая ширина строки, twips
+const BLUE = '005B9C', INK = '0F1E2E', GREY = '6B7480', ZEBRA = 'F4F7FA', MUTED = '33404D';
+
+function dxRun(text, c){
+  c = c || {};
+  let rPr = '';
+  if (c.b) rPr += '<w:b/><w:bCs/>';
+  if (c.i) rPr += '<w:i/><w:iCs/>';
+  if (c.color) rPr += '<w:color w:val="' + c.color + '"/>';
+  if (c.sz) rPr += '<w:sz w:val="' + c.sz + '"/><w:szCs w:val="' + c.sz + '"/>';
+  if (c.vert) rPr += '<w:vertAlign w:val="' + c.vert + '"/>';
+  return '<w:r>' + (rPr ? '<w:rPr>' + rPr + '</w:rPr>' : '') +
+    '<w:t xml:space="preserve">' + xesc(text) + '</w:t></w:r>';
+}
+function dxPara(runs, o){
+  o = o || {};
+  let pPr = '';
+  if (o.pageBreak) pPr += '<w:pageBreakBefore/>';
+  if (o.keepNext) pPr += '<w:keepNext/>';
+  if (o.border) pPr += o.border;
+  pPr += '<w:spacing w:before="' + (o.before || 0) + '" w:after="' +
+    (o.after === undefined ? 120 : o.after) + '" w:line="' + (o.line || 276) + '" w:lineRule="auto"/>';
+  if (o.indLeft || o.hanging)
+    pPr += '<w:ind w:left="' + (o.indLeft || 0) + '"' + (o.hanging ? ' w:hanging="' + o.hanging + '"' : '') + '/>';
+  else if (o.firstLine) pPr += '<w:ind w:firstLine="' + o.firstLine + '"/>';
+  pPr += '<w:jc w:val="' + (o.jc || 'both') + '"/>';
+  return '<w:p><w:pPr>' + pPr + '</w:pPr>' + runs + '</w:p>';
+}
+const BORDER_BOTTOM = (sz, color) =>
+  '<w:pBdr><w:bottom w:val="single" w:sz="' + sz + '" w:space="2" w:color="' + color + '"/></w:pBdr>';
+const BOX_BORDER =
+  '<w:pBdr><w:top w:val="dashed" w:sz="4" w:space="4" w:color="C9D3DD"/>' +
+  '<w:left w:val="dashed" w:sz="4" w:space="4" w:color="C9D3DD"/>' +
+  '<w:bottom w:val="dashed" w:sz="4" w:space="4" w:color="C9D3DD"/>' +
+  '<w:right w:val="dashed" w:sz="4" w:space="4" w:color="C9D3DD"/></w:pBdr>';
+
+/* ---------- инлайновые узлы -> runs ---------- */
+function dxInline(node, ctx, out){
+  const kids = node.childNodes;
+  for (let i = 0; i < kids.length; i++){
+    const n = kids[i];
+    if (n.nodeType === 3){
+      const t = String(n.nodeValue).replace(/\s+/g, ' ');
+      if (t) out.push(dxRun(t, ctx));
+    } else if (n.nodeType === 1){
+      const tag = n.tagName.toLowerCase();
+      if (tag === 'br'){ out.push('<w:r><w:br/></w:r>'); continue; }
+      if (tag === 'img'){ out.push(dxImage(n)); continue; }
+      const c = Object.assign({}, ctx);
+      if (tag === 'b' || tag === 'strong') c.b = true;
+      if (tag === 'i' || tag === 'em') c.i = true;
+      if (tag === 'sub') c.vert = 'subscript';
+      if (tag === 'sup') c.vert = 'superscript';
+      if (tag === 'small') c.sz = 20;
+      const cl = n.getAttribute ? (n.getAttribute('class') || '') : '';
+      if (cl.indexOf('fill') >= 0) c.color = BLUE;
+      dxInline(n, c, out);
+    }
+  }
+}
+function runsOf(node, ctx){
+  const out = [];
+  dxInline(node, ctx || {}, out);
+  return out.join('') || dxRun('', ctx || {});
+}
+
+/* ---------- изображения ---------- */
+let DX_IMAGES = [];
+function dxImage(img){
+  const src = img.getAttribute('src') || '';
+  const m = src.match(/^data:image\/(png|jpeg|jpg);base64,(.+)$/);
+  if (!m) return '';
+  const ext = (m[1] === 'png') ? 'png' : 'jpeg';
+  const bin = atob(m[2]);
+  const data = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) data[i] = bin.charCodeAt(i);
+  const id = DX_IMAGES.length + 1;
+  DX_IMAGES.push({ id, ext, data });
+  let pw = parseInt(img.getAttribute('data-w') || '0', 10) || 1200;
+  let ph = parseInt(img.getAttribute('data-h') || '0', 10) || 800;
+  const maxEmu = 5943600;                     // 6.5 дюйма
+  let cx = pw * 9525, cy = ph * 9525;
+  if (cx > maxEmu){ cy = Math.round(cy * maxEmu / cx); cx = maxEmu; }
+  const maxH = 8229600;                       // 9 дюймов
+  if (cy > maxH){ cx = Math.round(cx * maxH / cy); cy = maxH; }
+  const A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
+  return '<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0">' +
+    '<wp:extent cx="' + cx + '" cy="' + cy + '"/><wp:effectExtent l="0" t="0" r="0" b="0"/>' +
+    '<wp:docPr id="' + id + '" name="Рисунок ' + id + '"/>' +
+    '<wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="' + A + '" noChangeAspect="1"/></wp:cNvGraphicFramePr>' +
+    '<a:graphic xmlns:a="' + A + '"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
+    '<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
+    '<pic:nvPicPr><pic:cNvPr id="' + id + '" name="image' + id + '.' + ext + '"/><pic:cNvPicPr/></pic:nvPicPr>' +
+    '<pic:blipFill><a:blip r:embed="rIdImg' + id + '"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>' +
+    '<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + cx + '" cy="' + cy + '"/></a:xfrm>' +
+    '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>' +
+    '</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>';
+}
+
+/* ---------- таблицы ---------- */
+function dxTable(tbl, docW){
+  docW = docW || DOC_W;
+  const cls = tbl.getAttribute('class') || '';
+  const isKV = cls.indexOf('kv') >= 0;
+  const isWide = cls.indexOf('wide') >= 0;
+  const szBody = isWide ? 17 : 19, szHead = isWide ? 16 : 18;
+
+  // ширины колонок
+  let pcts = [];
+  const cg = tbl.querySelector('colgroup');
+  if (cg){
+    const cols = cg.querySelectorAll('col');
+    for (let i = 0; i < cols.length; i++){
+      const st = cols[i].getAttribute('style') || '';
+      const m = st.match(/width:\s*([\d.]+)%/);
+      pcts.push(m ? parseFloat(m[1]) : 0);
+    }
+  }
+  const firstRow = tbl.querySelector('tr');
+  const nCols = firstRow ? firstRow.children.length : 2;
+  if (!pcts.length || pcts.length !== nCols){
+    pcts = isKV ? [36, 64] : new Array(nCols).fill(100 / nCols);
+  }
+  const sum = pcts.reduce((a, b) => a + b, 0) || 100;
+  const grid = pcts.map(p => Math.round(docW * p / sum));
+
+  let xml = '<w:tbl><w:tblPr><w:tblW w:w="' + docW + '" w:type="dxa"/>' +
+    '<w:tblLayout w:type="fixed"/>' +
+    '<w:tblBorders>' +
+    ['top','left','bottom','right','insideH','insideV']
+      .map(s => '<w:' + s + ' w:val="single" w:sz="6" w:space="0" w:color="' + GREY + '"/>').join('') +
+    '</w:tblBorders>' +
+    '<w:tblCellMar><w:top w:w="60" w:type="dxa"/><w:left w:w="85" w:type="dxa"/>' +
+    '<w:bottom w:w="60" w:type="dxa"/><w:right w:w="85" w:type="dxa"/></w:tblCellMar>' +
+    '</w:tblPr><w:tblGrid>' + grid.map(w => '<w:gridCol w:w="' + w + '"/>').join('') + '</w:tblGrid>';
+
+  const rows = tbl.querySelectorAll('tr');
+  let bodyIdx = 0;
+  for (let r = 0; r < rows.length; r++){
+    const tr = rows[r];
+    const isHead = tr.parentNode && tr.parentNode.tagName &&
+      tr.parentNode.tagName.toLowerCase() === 'thead';
+    if (!isHead) bodyIdx++;
+    const zebra = (!isKV && !isHead && bodyIdx % 2 === 0);
+    xml += '<w:tr><w:trPr><w:cantSplit/>' + (isHead ? '<w:tblHeader/>' : '') + '</w:trPr>';
+    const cells = tr.children;
+    for (let c = 0; c < cells.length; c++){
+      const td = cells[c];
+      const tdCls = td.getAttribute('class') || '';
+      const center = tdCls.indexOf('n') >= 0 || isHead;
+      let shd = '';
+      if (isHead) shd = '<w:shd w:val="clear" w:color="auto" w:fill="' + BLUE + '"/>';
+      else if (zebra) shd = '<w:shd w:val="clear" w:color="auto" w:fill="' + ZEBRA + '"/>';
+      else if (isKV && c === 0) shd = '<w:shd w:val="clear" w:color="auto" w:fill="' + ZEBRA + '"/>';
+      const ctx = { sz: isHead ? szHead : szBody };
+      if (isHead){ ctx.b = true; ctx.color = 'FFFFFF'; }
+      if (isKV && c === 0 && !isHead) ctx.b = true;
+      xml += '<w:tc><w:tcPr><w:tcW w:w="' + (grid[c] || 0) + '" w:type="dxa"/>' + shd +
+        '<w:vAlign w:val="top"/></w:tcPr>' +
+        dxPara(runsOf(td, ctx), { jc: center ? 'center' : 'both', after: 0, line: 240 }) +
+        '</w:tc>';
+    }
+    xml += '</w:tr>';
+  }
+  return xml + '</w:tbl>' + '<w:p><w:pPr><w:spacing w:after="120" w:line="240" w:lineRule="auto"/></w:pPr></w:p>';
+}
+
+/* ---------- параметры секции ---------- */
+const LAND_W = 14118;   // рабочая ширина альбомного листа
+function dxSectPr(land){
+  return '<w:sectPr>' +
+    '<w:headerReference w:type="default" r:id="' + (land ? 'rIdH3' : 'rIdH1') + '"/>' +
+    '<w:headerReference w:type="first" r:id="rIdH2"/>' +
+    '<w:footerReference w:type="default" r:id="rIdF1"/>' +
+    '<w:footerReference w:type="first" r:id="rIdF2"/>' +
+    (land ? '' : '<w:titlePg/>') +
+    (land
+      ? '<w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/>' +
+        '<w:pgMar w:top="850" w:right="1360" w:bottom="850" w:left="1360" w:header="450" w:footer="400" w:gutter="0"/>'
+      : '<w:pgSz w:w="11906" w:h="16838"/>' +
+        '<w:pgMar w:top="1360" w:right="850" w:bottom="1250" w:left="1701" w:header="600" w:footer="500" w:gutter="0"/>') +
+    '<w:cols w:space="708"/><w:docGrid w:linePitch="360"/></w:sectPr>';
+}
+
+/* ---------- блочный обход ---------- */
+let DX_LAND_END = false;   // ориентация последней секции
+function dxBlocks(root){
+  let xml = '';
+  let land = false;
+  const kids = root.children;
+  for (let i = 0; i < kids.length; i++){
+    const el = kids[i];
+    const tag = el.tagName.toLowerCase();
+    const cls = el.getAttribute('class') || '';
+    const has = k => cls.split(/\s+/).indexOf(k) >= 0;
+
+    if (tag === 'h1'){
+      const wantLand = has('land');
+      if (wantLand !== land){
+        xml += '<w:p><w:pPr><w:spacing w:after="0"/>' + dxSectPr(land) + '</w:pPr></w:p>';
+        land = wantLand;
+      }
+      xml += dxPara(runsOf(el, { b: true, sz: 27, color: INK }), {
+        before: 300, after: 160, jc: 'left', keepNext: true,
+        pageBreak: has('pb') && !wantLand, border: BORDER_BOTTOM(18, BLUE)
+      });
+    } else if (tag === 'h2'){
+      xml += dxPara(runsOf(el, { b: true, sz: 25, color: INK }),
+        { before: 220, after: 120, jc: 'left', keepNext: true });
+    } else if (tag === 'table'){
+      xml += dxTable(el, land ? LAND_W : DOC_W);
+    } else if (tag === 'hr'){
+      xml += dxPara('', {
+        after: has('lh-rule2') ? 260 : 20,
+        border: '<w:pBdr><w:bottom w:val="single" w:sz="' + (has('lh-rule2') ? 6 : 20) +
+          '" w:space="1" w:color="' + BLUE + '"/></w:pBdr>'
+      });
+    } else if (tag === 'div' && has('letterhead')){
+      const ls = el.children;
+      for (let j = 0; j < ls.length; j++){
+        const d = ls[j], dc = d.getAttribute('class') || '';
+        if (dc.indexOf('lh-full') >= 0)
+          xml += dxPara(runsOf(d, { sz: 22 }), { jc: 'center', after: 30 });
+        else if (dc.indexOf('lh-branch') >= 0)
+          xml += dxPara(runsOf(d, { sz: 25, b: true }), { jc: 'center', after: 30 });
+        else
+          xml += dxPara(runsOf(d, { sz: 19, color: '333333' }), { jc: 'center', after: 20 });
+      }
+    } else if (tag === 'div' && has('spacer')){
+      xml += dxPara('', { after: 1100 });
+    } else if (tag === 'div' && has('pb')){
+      xml += dxPara('', { after: 0, pageBreak: true });
+    } else if (tag === 'ul' || tag === 'ol'){
+      const lis = el.children;
+      for (let j = 0; j < lis.length; j++){
+        const prefix = (tag === 'ol') ? (j + 1) + ')\u00A0' : '\u2013\u00A0';
+        xml += dxPara(dxRun(prefix, {}) + runsOf(lis[j], {}),
+          { indLeft: 720, hanging: 260, after: 60 });
+      }
+    } else if (tag === 'p'){
+      if (has('title-main')){
+        xml += dxPara(runsOf(el, { b: true, sz: 34 }), { jc: 'center', after: 160 });
+      } else if (has('fig')){
+        xml += dxPara(runsOf(el, {}), { jc: 'center', after: 100 });
+      } else if (has('fig-cap')){
+        xml += dxPara(runsOf(el, { sz: 21 }), { jc: 'center', after: 200 });
+      } else if (has('empty-note')){
+        xml += dxPara(runsOf(el, { i: true, sz: 21, color: '5C6B7A' }),
+          { jc: 'both', after: 160, before: 60, border: BOX_BORDER });
+      } else if (has('sec-note')){
+        xml += dxPara(runsOf(el, { i: true, sz: 21 }), { jc: 'both', after: 140 });
+      } else if (has('c')){
+        xml += dxPara(runsOf(el, {}), { jc: 'center' });
+      } else if (has('r')){
+        xml += dxPara(runsOf(el, {}), { jc: 'right', after: 40 });
+      } else if (has('ni')){
+        xml += dxPara(runsOf(el, {}), { jc: 'both' });
+      } else {
+        xml += dxPara(runsOf(el, {}), { jc: 'both', firstLine: 567 });
+      }
+    }
+  }
+  DX_LAND_END = land;
+  return xml;
+}
+
+/* ---------- сборка файла ---------- */
+function buildDocx(root, meta){
+  DX_IMAGES = [];
+  const bodyXml = dxBlocks(root);
+
+  const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ' +
+    'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ' +
+    'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"';
+  const XMLH = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+
+  const sectPr = dxSectPr(DX_LAND_END);
+
+  const document_xml = XMLH + '<w:document ' + NS + '><w:body>' + bodyXml + sectPr + '</w:body></w:document>';
+
+  const styles_xml = XMLH + '<w:styles ' + NS + '>' +
+    '<w:docDefaults><w:rPrDefault><w:rPr>' +
+    '<w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:eastAsia="Times New Roman" w:cs="Times New Roman"/>' +
+    '<w:sz w:val="24"/><w:szCs w:val="24"/><w:lang w:val="ru-RU"/></w:rPr></w:rPrDefault>' +
+    '<w:pPrDefault><w:pPr><w:spacing w:after="120" w:line="276" w:lineRule="auto"/>' +
+    '<w:jc w:val="both"/></w:pPr></w:pPrDefault></w:docDefaults>' +
+    '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>' +
+    '</w:styles>';
+
+  const hdrFtrNS = NS;
+  const hdrTxt = (meta && meta.headRight) ? meta.headRight : '';
+  const header1 = XMLH + '<w:hdr ' + hdrFtrNS + '><w:p><w:pPr>' +
+    '<w:tabs><w:tab w:val="right" w:pos="' + DOC_W + '"/></w:tabs>' +
+    '<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="' + BLUE + '"/></w:pBdr>' +
+    '<w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:jc w:val="left"/></w:pPr>' +
+    dxRun('Филиал ПАО «Россети Юг» — «Кубаньэнерго»', { sz: 17, color: MUTED }) +
+    '<w:r><w:tab/></w:r>' + dxRun(hdrTxt, { sz: 17, color: MUTED }) +
+    '</w:p></w:hdr>';
+  const header2 = XMLH + '<w:hdr ' + hdrFtrNS + '><w:p><w:pPr><w:spacing w:after="0"/></w:pPr></w:p></w:hdr>';
+  const header3 = XMLH + '<w:hdr ' + hdrFtrNS + '><w:p><w:pPr>' +
+    '<w:tabs><w:tab w:val="right" w:pos="' + LAND_W + '"/></w:tabs>' +
+    '<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="' + BLUE + '"/></w:pBdr>' +
+    '<w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:jc w:val="left"/></w:pPr>' +
+    dxRun('Филиал ПАО «Россети Юг» — «Кубаньэнерго»', { sz: 17, color: MUTED }) +
+    '<w:r><w:tab/></w:r>' + dxRun(hdrTxt, { sz: 17, color: MUTED }) +
+    '</w:p></w:hdr>';
+
+  const fld = (instr) =>
+    '<w:r><w:fldChar w:fldCharType="begin"/></w:r>' +
+    '<w:r><w:instrText xml:space="preserve"> ' + instr + ' </w:instrText></w:r>' +
+    '<w:r><w:fldChar w:fldCharType="separate"/></w:r>' +
+    '<w:r><w:rPr><w:sz w:val="17"/><w:color w:val="' + MUTED + '"/></w:rPr><w:t>1</w:t></w:r>' +
+    '<w:r><w:fldChar w:fldCharType="end"/></w:r>';
+  const footTxt = (meta && meta.footText) ? meta.footText : '';
+  const footer1 = XMLH + '<w:ftr ' + hdrFtrNS + '><w:p><w:pPr>' +
+    '<w:pBdr><w:top w:val="single" w:sz="6" w:space="1" w:color="' + BLUE + '"/></w:pBdr>' +
+    '<w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/><w:jc w:val="center"/></w:pPr>' +
+    dxRun(footTxt + ' · Лист ', { sz: 17, color: MUTED }) + fld('PAGE') +
+    dxRun(' из ', { sz: 17, color: MUTED }) + fld('NUMPAGES') +
+    '</w:p></w:ftr>';
+  const footer2 = XMLH + '<w:ftr ' + hdrFtrNS + '><w:p><w:pPr><w:spacing w:after="0"/></w:pPr></w:p></w:ftr>';
+
+  let rels = XMLH + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rIdS" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
+    '<Relationship Id="rIdH1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>' +
+    '<Relationship Id="rIdH2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header2.xml"/>' +
+    '<Relationship Id="rIdH3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header3.xml"/>' +
+    '<Relationship Id="rIdF1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>' +
+    '<Relationship Id="rIdF2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer2.xml"/>';
+  DX_IMAGES.forEach(im => {
+    rels += '<Relationship Id="rIdImg' + im.id + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image' + im.id + '.' + im.ext + '"/>';
+  });
+  rels += '</Relationships>';
+
+  const ct = XMLH + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+    '<Default Extension="xml" ContentType="application/xml"/>' +
+    '<Default Extension="png" ContentType="image/png"/>' +
+    '<Default Extension="jpeg" ContentType="image/jpeg"/>' +
+    '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+    '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>' +
+    '<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>' +
+    '<Override PartName="/word/header2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>' +
+    '<Override PartName="/word/header3.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>' +
+    '<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>' +
+    '<Override PartName="/word/footer2.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>' +
+    '</Types>';
+
+  const rootRels = XMLH + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+    '</Relationships>';
+
+  const files = [
+    { name: '[Content_Types].xml', data: ct },
+    { name: '_rels/.rels', data: rootRels },
+    { name: 'word/document.xml', data: document_xml },
+    { name: 'word/styles.xml', data: styles_xml },
+    { name: 'word/header1.xml', data: header1 },
+    { name: 'word/header2.xml', data: header2 },
+    { name: 'word/header3.xml', data: header3 },
+    { name: 'word/footer1.xml', data: footer1 },
+    { name: 'word/footer2.xml', data: footer2 },
+    { name: 'word/_rels/document.xml.rels', data: rels }
+  ];
+  DX_IMAGES.forEach(im => files.push({ name: 'word/media/image' + im.id + '.' + im.ext, data: im.data }));
+  return zipStore(files);
+}
+
+
+function exportWord(){
+  try{
+    const meta = {
+      headRight: (raw('ОТЧЁТ_НОМЕР') ? 'Отчёт ' + raw('ОТЧЁТ_НОМЕР') : '') +
+                 (raw('ОТЧЁТ_ДАТА') ? ' от ' + raw('ОТЧЁТ_ДАТА') : ''),
+      footText: 'Отчёт по пункту 13 Правил недискриминационного доступа (ПП РФ № 2106)' +
+                (raw('ОБЪЕКТ_НАИМ') ? ' · ' + raw('ОБЪЕКТ_НАИМ') : '')
+    };
+    const bytes = buildDocx(document.getElementById('doc'), meta);
+    const blob = new Blob([bytes], {
+      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const nm = (raw('ОТЧЁТ_НОМЕР') || 'Otchet_p13').replace(/[^\wА-Яа-яЁё\-]+/g, '_');
+    a.href = url; a.download = nm + '.docx';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    log('Выгружен файл ' + nm + '.docx', 's');
+  }catch(err){
+    log('Не удалось сформировать .docx: ' + err.message, 'e');
+  }
+}
+
+/* ==================================== ПРИЁМ ДАННЫХ ИЗ ПОЛЕВОГО ОСМОТРА */
+function loadFromBase64(b64, label){
+  try{
+    const wb = XLSX.read(b64, { type:'base64', cellDates:false });
+    parseWorkbook(wb);
+    render();
+    markSrc();
+    log('Отчёт сформирован по данным осмотра' + (label ? ' («' + label + '»)' : '') + '.', 's');
+    return true;
+  }catch(err){
+    clearLog();
+    log('Данные осмотра не прочитаны: ' + err.message, 'e');
+    return false;
+  }
+}
+function pullOsmotr(){
+  if (typeof PPO === 'undefined'){ log('Ядро рабочего места не загрузилось.', 'e'); return; }
+  const D = PPO.load();
+  if (!D.poles.length && !Object.keys(D.pass).length){
+    clearLog();
+    /* частая причина пустоты — переполненное хранилище: сохранение осмотра
+       не прошло, хотя пользователь данные вводил */
+    let hint = '';
+    try {
+      if (localStorage.getItem('ppo_map_state_v1'))
+        hint = ' Обнаружен кэш меток карты — возможно, он занял место в браузере и сохранение осмотра не прошло.' +
+               ' Откройте «Карта» и нажмите «🗑», либо очистите кэш кнопкой ниже.';
+    } catch (e) {}
+    log('В осмотре пока нет данных. Откройте раздел «Осмотр» и заполните объект и опоры.' + hint, 'e');
+    if (hint){
+      const b = document.createElement('button');
+      b.className = 'btn plain'; b.type = 'button';
+      b.textContent = 'Очистить кэш меток карты и повторить';
+      b.onclick = function(){
+        try { localStorage.removeItem('ppo_map_state_v1'); } catch (e) {}
+        clearLog();
+        log('Кэш меток карты очищен. Вернитесь в «Осмотр», убедитесь, что данные на месте, и нажмите кнопку ещё раз.', 'w');
+      };
+      const lg = document.getElementById('log');
+      if (lg) lg.appendChild(b);
+    }
+    return;
+  }
+  clearLog();
+  log('Заполняю шаблон ID_shablon.xlsx данными осмотра…');
+
+  /* Сторожевой таймер: что бы ни случилось с сетью или разбором книги,
+     пользователь получит ответ, а не бесконечное ожидание. */
+  let settled = false;
+  const watchdog = setTimeout(() => {
+    if (settled) return;
+    settled = true;
+    log('Сборка не завершилась за 20 секунд. Собираю отчёт напрямую по данным осмотра, без шаблона…', 'w');
+    try {
+      parseWorkbook(PPO.buildWorkbook());
+      render();
+      markSrc();
+      log('Отчёт собран значениями. Нажмите «Диагностика», чтобы выяснить, что мешает шаблону.', 's');
+    } catch (e2) {
+      log('Не удалось собрать отчёт: ' + (e2 && e2.message ? e2.message : e2), 'e');
+      showDiag();
+    }
+  }, 20000);
+
+  let p;
+  try { p = PPO.buildFilled(); }
+  catch (e) {
+    clearTimeout(watchdog); settled = true;
+    log('Не удалось начать сборку: ' + (e && e.message ? e.message : e), 'e');
+    showDiag();
+    return;
+  }
+  p.then(res => {
+    if (settled) return;
+    settled = true; clearTimeout(watchdog);
+    parseWorkbook(res.wb);
+    render();
+    markSrc();
+    if (!res.fromTemplate){
+      const ti = PPO.templateInfo ? PPO.templateInfo() : null;
+      log('Шаблон ID_shablon.xlsx не использован' +
+          (ti && ti.error ? ' (' + ti.error + ')' : '') +
+          ' — данные собраны значениями. На содержание отчёта это не влияет.', 'w');
+    }
+    const pr = PPO.problems().filter(x => x.lv === 'stop');
+    if (pr.length) log('В осмотре ' + pr.length + ' замечаний, блокирующих выпуск — проверьте вкладку «Проверка и выгрузка».', 'w');
+  }).catch(err => {
+    if (settled) return;
+    settled = true; clearTimeout(watchdog);
+    /* последняя линия обороны: отчёт собираем по данным осмотра напрямую */
+    log('Шаблон обработать не удалось: ' + (err && err.message ? err.message : err), 'w');
+    try {
+      parseWorkbook(PPO.buildWorkbook());
+      render();
+      markSrc();
+      log('Отчёт собран напрямую по данным осмотра.', 's');
+    } catch (e3) {
+      log('Отчёт собрать не удалось: ' + (e3 && e3.message ? e3.message : e3), 'e');
+      showDiag();
+    }
+  });
+}
+
+/* Диагностика: печатает всё, от чего зависит сборка отчёта. Нужна потому,
+   что разные хостинги по-разному отдают статические файлы, а данные осмотра
+   привязаны к конкретному адресу сайта. */
+function showDiag(){
+  const L = [];
+  const yn = v => v ? 'да' : 'НЕТ';
+  L.push('Адрес страницы: ' + location.origin + location.pathname);
+  L.push('Протокол: ' + location.protocol);
+  L.push('Модули: ядро PPO — ' + yn(typeof PPO !== 'undefined') +
+         '; XLSX — ' + yn(typeof XLSX !== 'undefined') +
+         '; JSZip — ' + yn(typeof JSZip !== 'undefined') +
+         '; правка книги PPOXLSX — ' + yn(typeof PPOXLSX !== 'undefined'));
+  let store = 'недоступно';
+  try {
+    localStorage.setItem('__ppo_probe', '1'); localStorage.removeItem('__ppo_probe');
+    let bytes = 0;
+    for (let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      bytes += (localStorage.getItem(k) || '').length + k.length;
+    }
+    store = 'доступно, занято ~' + Math.round(bytes / 1024) + ' КБ';
+  } catch (e) { store = 'НЕДОСТУПНО (' + (e && e.name ? e.name : 'ошибка') + ')'; }
+  L.push('Хранилище браузера: ' + store);
+  if (typeof PPO !== 'undefined'){
+    const D = PPO.load();
+    L.push('Данные осмотра на ЭТОМ адресе: опор — ' + D.poles.length +
+           ', измерений — ' + D.meas.length + ', полей паспорта — ' + Object.keys(D.pass).length);
+    const ti = PPO.templateInfo ? PPO.templateInfo() : null;
+    if (ti && ti.tried)
+      L.push('Шаблон ID_shablon.xlsx: запрос выполнен, код ' + ti.status +
+             ', тип «' + (ti.type || 'не указан') + '», получено ' + ti.bytes + ' байт, ' +
+             'является книгой Excel — ' + yn(ti.zip) + (ti.error ? ', ошибка: ' + ti.error : ''));
+    else
+      L.push('Шаблон ID_shablon.xlsx: запрос не выполнялся');
+  }
+  L.push('———');
+  L.push('Данные осмотра хранятся в браузере отдельно для каждого адреса сайта. ' +
+         'Если осмотр заполняли на другом адресе, здесь он будет пустым — перенесите данные ' +
+         'книгой Excel: в разделе «Осмотр» нажмите «Скачать книгу», а здесь загрузите её файлом.');
+  clearLog();
+  L.forEach(t => log(t, 'w'));
+}
+
+/* ============================================================ СОБЫТИЯ */
+document.getElementById('btnFromOsmotr').addEventListener('click', pullOsmotr);
+const btnDiag = document.getElementById('btnDiag');
+if (btnDiag) btnDiag.addEventListener('click', showDiag);
+
+/* фотографии, привязанные к опорам при импорте KMZ или в карточке опоры */
+function pullPhotos(onlyDefect, silent){
+  if (typeof PPO === 'undefined') return Promise.resolve(0);
+  return PPO.photosForReport({ onlyDefect:!!onlyDefect }).then(list => {
+    if (!list.length){
+      if (!silent) log(onlyDefect
+        ? 'Фотографий дефектных опор нет: либо дефекты не выявлены, либо к ним не привязаны снимки.'
+        : 'В осмотре нет фотографий. Их добавляет импорт KMZ или карточка опоры.', 'w');
+      return 0;
+    }
+    S.photos = list;
+    renderThumbs(); render();
+    log('Приложение В: ' + list.length + (onlyDefect ? ' фото дефектных опор' : ' фотоматериалов') +
+        '. Подписи проставлены по опорам, у дефектных указана категория.', 's');
+    return list.length;
+  }).catch(err => { log('Фотографии не загрузились: ' + err.message, 'e'); return 0; });
+}
+document.getElementById('btnPhotosDefect').addEventListener('click', () => pullPhotos(true, false));
+document.getElementById('btnPhotosAll').addEventListener('click', () => pullPhotos(false, false));
+document.getElementById('fXls').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = ev => {
+    try{
+      const wb = XLSX.read(new Uint8Array(ev.target.result), { type:'array', cellDates:false });
+      parseWorkbook(wb);
+      render();
+      SRC_STAMP = null; paintStale();   /* файл с диска: сверять не с чем */
+      log('Отчёт сформирован.', 's');
+    }catch(err){
+      clearLog();
+      log('Файл не прочитан: ' + err.message, 'e');
+      log('Проверьте, что загружается .xlsx и структура листов не изменена.');
+    }
+  };
+  r.onerror = () => { clearLog(); log('Не удалось прочитать файл с диска.', 'e'); };
+  r.readAsArrayBuffer(f);
+});
+
+/* ПДФ -> изображения страниц; растровые файлы -> данные изображения */
+async function fileToImages(f, maxPages){
+  const name = f.name.replace(/\.[^.]+$/,'');
+  if (/\.pdf$/i.test(f.name) || f.type === 'application/pdf'){
+    if (typeof pdfjsLib === 'undefined'){
+      log('Библиотека обработки ПДФ не загрузилась — файл «' + f.name + '» пропущен. Проверьте доступ к сети.', 'e');
+      return [];
+    }
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const buf = await f.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    const n = Math.min(pdf.numPages, maxPages || 30);
+    const out = [];
+    for (let p = 1; p <= n; p++){
+      const page = await pdf.getPage(p);
+      const vp = page.getViewport({ scale: 2.0 });
+      const cv = document.createElement('canvas');
+      cv.width = vp.width; cv.height = vp.height;
+      await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+      out.push({ src: cv.toDataURL('image/jpeg', 0.88), w: cv.width, h: cv.height,
+                 name: name + (n > 1 ? ' — стр. ' + p : '') });
+    }
+    if (pdf.numPages > n) log('Документ ПДФ «' + f.name + '»: преобразовано ' + n + ' из ' + pdf.numPages + ' страниц.', 'w');
+    return out;
+  }
+  return new Promise(res => {
+    const r = new FileReader();
+    r.onload = ev => {
+      const im = new Image();
+      im.onload = () => res([{ src: ev.target.result, w: im.naturalWidth, h: im.naturalHeight, name }]);
+      im.onerror = () => res([{ src: ev.target.result, w: 1200, h: 800, name }]);
+      im.src = ev.target.result;
+    };
+    r.onerror = () => { log('Не удалось прочитать «' + f.name + '».', 'e'); res([]); };
+    r.readAsDataURL(f);
+  });
+}
+
+document.getElementById('fScheme').addEventListener('change', async e => {
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+  for (const f of files){
+    const imgs = await fileToImages(f, 30);
+    imgs.forEach(im => S.schemes.push(im));
+  }
+  render();
+  log('Схема размещения: листов в приложении А — ' + S.schemes.length + '.', 's');
+  e.target.value = '';
+});
+
+document.getElementById('fPhotos').addEventListener('change', async e => {
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+  for (const f of files){
+    const imgs = await fileToImages(f, 30);
+    imgs.forEach(im => S.photos.push({ src: im.src, w: im.w, h: im.h, name: 'опора № ____, ' + im.name }));
+  }
+  renderThumbs(); render();
+  log('Фотоматериалов в приложении В: ' + S.photos.length + '. Подписи отредактируйте в документе.', 's');
+  e.target.value = '';
+});
+
+function renderThumbs(){
+  const t = document.getElementById('thumbs');
+  t.innerHTML = '';
+  S.photos.forEach(p => { const i = document.createElement('img'); i.src = p.src; t.appendChild(i); });
+}
+
+/* ---------------------------------------------------------------- ШЛЮЗ
+   Выпуск документа при наличии несоответствий возможен только через
+   письменное решение, которое печатается в листе внутреннего контроля.
+   Раньше кнопки работали независимо от результата контроля — и оба
+   разобранных отчёта ушли адресатам с несоответствиями. */
+function withGate(action, fn){
+  /* Данные осмотра могли измениться после сборки отчёта — например, замечания
+     как раз и устраняли. Проверять по устаревшему снимку бессмысленно:
+     обновляем его перед контролем, а не после. */
+  if (srcStale()){
+    log('Данные осмотра изменились после сборки отчёта — пересобираю перед контролем…', 'w');
+    if (refreshFromOsmotr()) log('Отчёт пересобран по текущим данным осмотра.', 's');
+  }
+  if (typeof PPOAudit === 'undefined' || !PPOAudit.gate){ fn(); return; }
+  const audit = LAST_AUDIT || [];
+  if (!audit.length){ fn(); return; }
+  PPOAudit.gate(audit, action).then(ok => {
+    if (!ok){
+      log('Выпуск отменён: устраните несоответствия в листе внутреннего контроля.', 'w');
+      const panel = document.getElementById('auditSum');
+      if (panel) panel.scrollIntoView({ behavior:'smooth', block:'center' });
+      return;
+    }
+    const rel = PPOAudit.releaseDecision();
+    if (rel && rel.reason){
+      /* решение должно попасть в документ — пересобираем отчёт */
+      render();
+      log('Отчёт выпущен при наличии несоответствий; решение внесено в лист внутреннего контроля.', 'w');
+    }
+    fn();
+  });
+}
+document.getElementById('btnPrint').addEventListener('click', () => {
+  withGate('print', () => { document.body.classList.remove('wm'); window.print(); });
+});
+document.getElementById('btnPrintWm').addEventListener('click', () => {
+  withGate('print', () => {
+    document.body.classList.add('wm');
+    log('Водяной знак включён. В диалоге печати выберите «Сохранить как ПДФ» и включите печать фона.');
+    window.print();
+    setTimeout(() => document.body.classList.remove('wm'), 800);
+  });
+});
+document.getElementById('btnWord').addEventListener('click', () => withGate('word', exportWord));
+function rebuildNow(){
+  if (typeof PPO === 'undefined'){ log('Ядро рабочего места не загрузилось.', 'e'); return; }
+  const D = PPO.load();
+  if (!D.poles.length && !Object.keys(D.pass).length){
+    log('В осмотре пока нет данных — пересобирать нечего.', 'e');
+    return;
+  }
+  clearLog();
+  if (refreshFromOsmotr())
+    log('Отчёт пересобран по текущим данным осмотра: опор — ' + D.poles.length +
+        ', измерений — ' + D.meas.length + '.', 's');
+}
+document.getElementById('btnStale').addEventListener('click', rebuildNow);
+/* Та же пересборка отдельной кнопкой: полоса устаревания появляется не всегда
+   (отчёт мог быть загружен файлом), а пересобрать по текущим данным нужно
+   уметь в любой момент. */
+document.getElementById('btnRebuild').addEventListener('click', rebuildNow);
+/* Данные могли поменяться в соседней вкладке «Осмотр»: сверяемся при возврате
+   на страницу и при каждом сохранении объекта. */
+document.addEventListener('ppo:saved', paintStale);
+window.addEventListener('focus', paintStale);
+window.addEventListener('storage', paintStale);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) paintStale(); });
+
+/* стартовый рендер — пустая эталонная форма */
+render();
+
+/* --- автоматический приём при переходе со страницы осмотра --- */
+if (typeof PPO !== 'undefined'){
+  PPO.mountNav('index.html');
+  const h = PPO.takeHandoff();
+  if (h){
+    loadFromBase64(h.b64, h.name);
+    /* фото дефектных опор — обязательное подтверждение выявленных дефектов,
+       поэтому они попадают в приложение В сами; остальные — по кнопке */
+    PPO.photoCountDefect().then(nd => {
+      if (nd) return pullPhotos(true, true);
+      return 0;
+    }).then(() => PPO.photoCount()).then(n => {
+      const shown = S.photos.length;
+      if (n > shown)
+        log('В осмотре ещё ' + (n - shown) + ' фото недефектных опор. Кнопка «Все фото из осмотра» добавит и их.', 'w');
+    });
+  }
+}
+</script>
+</body>
+</html>

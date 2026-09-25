@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Импорт полевого обхода · ППО ВОЛС</title>
+<link rel="stylesheet" href="ppo-ui.css?v=3.6.3">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="ppo-xlsx.js?v=3.6.3"></script>
+<style>
+.steps{display:flex;gap:0;margin-bottom:20px;overflow-x:auto}
+.steps div{flex:1;min-width:120px;padding:10px 12px;border-bottom:3px solid var(--line-s);
+  font-size:12.5px;font-weight:650;color:var(--muted);white-space:nowrap}
+.steps div b{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.1em;margin-bottom:3px}
+.steps div.on{border-bottom-color:var(--blue);color:var(--ink)}
+.steps div.done{border-bottom-color:var(--ok);color:var(--ok)}
+.stage{display:none} .stage.on{display:block}
+
+.drop{border:2px dashed var(--line);border-radius:14px;padding:44px 22px;text-align:center;background:#fff;
+  cursor:pointer;display:block}
+.drop:hover,.drop.over{border-color:var(--blue-2);background:var(--blue-l)}
+.drop b{display:block;font-size:18px;margin-bottom:6px}
+.drop span{font-size:13.5px;color:var(--muted)}
+
+.sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:18px}
+.sum div{background:#fff;border:1px solid var(--line-s);border-radius:10px;padding:13px}
+.sum b{display:block;font-size:26px;font-variant-numeric:tabular-nums;letter-spacing:-.02em;color:var(--blue-d)}
+.sum span{font-size:12.5px;color:var(--muted)}
+
+.bar{height:8px;border-radius:999px;background:var(--line-s);overflow:hidden;margin:14px 0 8px}
+.bar i{display:block;height:100%;background:var(--blue);width:0;transition:width .2s}
+select.mk{padding:6px 8px;border:1px solid var(--line);border-radius:7px;font-size:13px;max-width:220px}
+tr.unknown td{background:var(--warn-bg)!important}
+.lncheck{display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--line-s);
+  border-radius:9px;background:#fff;margin-bottom:6px;font-size:13.5px}
+.lncheck input{width:17px;height:17px;flex:0 0 auto}
+.lncheck .nm{flex:1;font-weight:600}
+</style>
+</head>
+<body>
+
+<header class="ppo-top"><div class="ppo-top-in">
+  <div class="ppo-mark">ППО</div>
+  <div class="ppo-brand"><b>Импорт полевого обхода</b><span>KMZ с фотографиями → отчёт по п. 13 Правил</span></div>
+  <nav id="ppoNav"></nav>
+</div></header>
+
+<div class="wrap narrow">
+
+  <div class="steps" id="steps">
+    <div data-s="1"><b>Шаг 1</b>Файл обхода</div>
+    <div data-s="2"><b>Шаг 2</b>Проверка распознанного</div>
+    <div data-s="3"><b>Шаг 3</b>Реквизиты отчёта</div>
+    <div data-s="4"><b>Шаг 4</b>Перенос данных</div>
+    <div data-s="5"><b>Шаг 5</b>Готово</div>
+  </div>
+
+  <!-- ============================================================ ШАГ 1 -->
+  <section class="stage on" id="s1">
+    <label class="drop" id="drop" for="fkmz">
+      <b>Перетащите сюда KMZ полевого обхода</b>
+      <span>или нажмите, чтобы выбрать файл. Принимаются .kmz и .kml.<br>
+      Фотографии внутри архива подхватятся автоматически.</span>
+    </label>
+    <input type="file" id="fkmz" accept=".kmz,.kml" hidden>
+    <div id="s1msg"></div>
+
+    <div class="card" style="margin-top:18px">
+      <div class="eyebrow">Как подписывать метки в поле</div>
+      <h2>Схема подписи, которую понимает импорт</h2>
+      <p class="sub">Ровно та, что вы уже используете. Двоеточие разделяет части.</p>
+      <div class="note" style="margin-top:0"><b>номер : марка : линия : примечание</b>
+        <code>104:П10-1:ВЛ 10 - Сщ-7</code> — полная подпись.<br>
+        <code>103: УА10-1</code> — линия наследуется от предыдущей метки.<br>
+        <code>2-5:П3:ВЛ 0,4 №1 ТП Сщ-7 - 4:Отклонение от оси</code> — примечание даёт категорию дефекта.
+      </div>
+      <p class="mini">Полевые сокращения марок (П3, УА10-1, П10/0,38) приводятся к маркам справочника
+         по типу опоры и классу напряжения — на следующем шаге это можно проверить и поправить.
+         Класс напряжения берётся из названия линии. Пролёты считаются по координатам.
+         Метки, у которых первая часть не номер (например «Б/С»), в опоры не попадают.</p>
+    </div>
+  </section>
+
+  <!-- ============================================================ ШАГ 2 -->
+  <section class="stage" id="s2">
+    <div class="sum" id="sum"></div>
+
+    <div class="card">
+      <h2>Соответствие марок</h2>
+      <p class="sub">Полевое сокращение → марка справочника. От неё зависят материал, тип,
+         допустимый изгибающий момент и оценка несущей способности.
+         Исходное обозначение сохранится в примечании к опоре.</p>
+      <div class="tblwrap"><table class="tbl" id="marks"></table></div>
+    </div>
+
+    <div class="card">
+      <h2>Линии в обходе</h2>
+      <p class="sub">Отметьте те, что входят в предмет отчёта. Снятые линии не переносятся.</p>
+      <div id="lines"></div>
+    </div>
+
+    <div class="card" id="skipcard" style="display:none">
+      <h2>Метки, не ставшие опорами</h2>
+      <p class="sub">Первая часть подписи не похожа на номер опоры. Проверьте, не потерялось ли нужное.</p>
+      <div id="skips"></div>
+    </div>
+
+    <div class="btnrow">
+      <button class="btn ghost" onclick="go(1)">Назад</button>
+      <button class="btn" onclick="go(3)">Дальше — реквизиты</button>
+    </div>
+  </section>
+
+  <!-- ============================================================ ШАГ 3 -->
+  <section class="stage" id="s3">
+    <div class="card">
+      <h2>Реквизиты отчёта</h2>
+      <p class="sub">Что можно, подставлено из файла обхода: даты работ, классы напряжения,
+         наименование объекта. Остальное — обязательный минимум для выпуска отчёта.</p>
+      <div id="passForm"></div>
+    </div>
+    <div class="btnrow">
+      <button class="btn ghost" onclick="go(2)">Назад</button>
+      <button class="btn" onclick="go(4)">Дальше — перенос</button>
+    </div>
+  </section>
+
+  <!-- ============================================================ ШАГ 4 -->
+  <section class="stage" id="s4">
+    <div class="card">
+      <h2>Перенос данных</h2>
+      <p class="sub">Опоры, координаты, пролёты и дефекты уйдут в осмотр; фотографии
+         будут сжаты и привязаны к опорам для приложения В.</p>
+      <div class="bar"><i id="prog"></i></div>
+      <div id="s4msg" class="mini">Готово к переносу.</div>
+      <div class="btnrow" style="margin-top:14px">
+        <button class="btn ghost" onclick="go(2)">Назад</button>
+        <button class="btn" id="runBtn">Перенести</button>
+      </div>
+      <p class="mini" style="margin-top:14px">Существующие данные осмотра будут заменены.
+         Если там есть что-то нужное — сначала сохраните резервную копию на странице «Начало».</p>
+    </div>
+  </section>
+
+  <!-- ============================================================ ШАГ 5 -->
+  <section class="stage" id="s5">
+    <div class="card" id="doneCard"></div>
+  </section>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="ppo-core.js?v=3.6.3"></script>
+<script src="ppo-refs.js?v=3.6.3"></script>
+<script src="ppo-geo.js?v=3.6.3"></script>
+<script src="ppo-kmz.js?v=3.6.3"></script>
+<script>
+'use strict';
+var R = null, MARKMAP = {}, LINEON = {};
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s===undefined||s===null?'':s)
+  .replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function toast(m,bad){ var t=$('toast'); t.textContent=m; t.className='toast on'+(bad?' bad':'');
+  setTimeout(function(){t.className='toast';},2800); }
+PPO.mountNav('potok.html');
+
+var step = 1;
+function go(n){
+  if (n > 1 && !R){ toast('Сначала загрузите файл обхода', true); return; }
+  step = n;
+  for (var i=1;i<=5;i++) $('s'+i).classList.toggle('on', i===n);
+  Array.prototype.forEach.call($('steps').children, function(d){
+    var k = +d.dataset.s;
+    d.className = k===n ? 'on' : (k<n ? 'done' : '');
+  });
+  if (n===3) paintPass();
+  window.scrollTo(0,0);
+}
+
+/* ------------------------------------------------------------- ШАГ 1 */
+var drop = $('drop');
+['dragenter','dragover'].forEach(function(e){
+  drop.addEventListener(e, function(ev){ ev.preventDefault(); drop.classList.add('over'); }); });
+['dragleave','drop'].forEach(function(e){
+  drop.addEventListener(e, function(ev){ ev.preventDefault(); drop.classList.remove('over'); }); });
+drop.addEventListener('drop', function(ev){
+  if (ev.dataTransfer.files.length) handle(ev.dataTransfer.files[0]); });
+$('fkmz').onchange = function(e){ if (e.target.files[0]) handle(e.target.files[0]); };
+
+var SRC = null;
+function handle(file){
+  $('s1msg').innerHTML = '<div class="note"><b>Читаю ' + esc(file.name) + '</b>Разбираю подписи меток…</div>';
+  PPOKMZ.readAny(file).then(function(src){
+    SRC = src;
+    R = PPOKMZ.interpret(PPOKMZ.parseKml(src.kml));
+    if (!R.poles.length) throw new Error('В файле не нашлось меток, похожих на опоры');
+    R.marks.forEach(function(m){ MARKMAP[m.field || ''] = m.guess || ''; });
+    R.lines.forEach(function(l){ LINEON[l.name] = true; });
+    paintStep2();
+    go(2);
+    toast('Распознано опор: ' + R.poles.length);
+  }).catch(function(e){
+    $('s1msg').innerHTML = '<div class="note bad"><b>Файл не прочитан</b>' + esc(e.message) + '</div>';
+  });
+}
+
+/* ------------------------------------------------------------- ШАГ 2 */
+function paintStep2(){
+  var old = document.getElementById('spannote'); if (old) old.remove();
+  var unknown = R.marks.filter(function(m){ return !m.guess; }).length;
+  $('sum').innerHTML =
+    cell(R.poles.length, 'опор распознано') +
+    cell(R.lines.length, 'линий') +
+    cell(R.photoCount, 'фотографий') +
+    cell(R.kvList.join(' / ') || '—', 'классов, кВ') +
+    cell(R.poles.filter(function(p){ return p.defect!=='—'; }).length, 'с дефектами') +
+    cell(unknown, 'марок без пары', unknown ? 'var(--warn)' : '');
+  var st = R.spanStat || { done:0, ends:0, jumps:[] };
+  $('sum').insertAdjacentHTML('afterend',
+    '<div class="note' + (st.jumps.length ? ' warn' : '') + '" id="spannote"><b>Пролёты по координатам: ' +
+    st.done + '</b>У последних опор каждой линии пролёта нет — таких ' + st.ends + '. ' +
+    (st.jumps.length
+      ? 'Похоже на разрыв трассы, пролёт не записан: ' + st.jumps.map(function(j){
+          return '№ ' + esc(j.a) + ' → № ' + esc(j.b) + ' (' + j.d + ' м, ' + esc(j.line) + ')'; }).join('; ') +
+        '. Проверьте порядок обхода или впишите пролёт вручную в карточке опоры.'
+      : 'Разрывов трассы не обнаружено.') + '</div>');
+  function cell(v,l,c){ return '<div><b'+(c?' style="color:'+c+'"':'')+'>'+esc(v)+'</b><span>'+esc(l)+'</span></div>'; }
+
+  $('marks').innerHTML = '<tr><th>В поле</th><th>кВ</th><th>Опор</th><th>Тип по назначению</th><th>Марка справочника</th></tr>' +
+    R.marks.map(function(m, i){
+      var arr = m.kv ? PPO.polesByKv(m.kv) : PPO.POLES;
+      return '<tr' + (m.guess ? '' : ' class="unknown"') + '>' +
+        '<td><b>' + esc(m.field || '— не указана —') + '</b></td>' +
+        '<td>' + esc(m.kv || '?') + '</td><td>' + m.n + '</td>' +
+        '<td>' + esc(m.type || 'не определён') + (m.combined ? '<div class="mini">совмещённая с ВЛ 0,4 кВ</div>' : '') + '</td>' +
+        '<td><select class="mk" data-m="' + esc(m.field||'') + '"><option value="">— не выбрана —</option>' +
+        arr.map(function(o){
+          return '<option' + (o.mark===m.guess ? ' selected' : '') + '>' + esc(o.mark) + '</option>'; }).join('') +
+        '</select></td></tr>';
+    }).join('');
+  Array.prototype.forEach.call($('marks').querySelectorAll('.mk'), function(sel){
+    sel.onchange = function(){ MARKMAP[sel.dataset.m] = sel.value; };
+  });
+
+  $('lines').innerHTML = R.lines.map(function(l, i){
+    return '<label class="lncheck"><input type="checkbox" data-l="' + i + '" checked>' +
+      '<span class="nm">' + esc(l.name || '(линия не указана)') + '</span>' +
+      '<span class="tag neutral">' + esc(l.kv || '?') + ' кВ</span>' +
+      '<span class="mini">опор ' + l.n + '</span></label>';
+  }).join('');
+  Array.prototype.forEach.call($('lines').querySelectorAll('[data-l]'), function(cb){
+    cb.onchange = function(){ LINEON[R.lines[+cb.dataset.l].name] = cb.checked; };
+  });
+
+  if (R.skipped.length){
+    $('skipcard').style.display = '';
+    $('skips').innerHTML = R.skipped.map(function(s){
+      return '<div class="note warn" style="margin:6px 0"><b>' + esc(s.raw || '(без подписи)') + '</b>' +
+        s.lat.toFixed(6) + ', ' + s.lon.toFixed(6) +
+        (s.imgs.length ? ' · фотографий: ' + s.imgs.length : '') + '</div>'; }).join('');
+  }
+}
+
+/* ------------------------------------------------------------- ШАГ 3 */
+var MIN_FIELDS = ['ЗАПРОС_НОМЕР','ЗАПРОС_ВХ_ДАТА','ВЛАДЕЛЕЦ_НАИМ','ВЛАДЕЛЕЦ_ФИЛИАЛ',
+  'ПОЛЬЗОВАТЕЛЬ_НАИМ','ОБЪЕКТ_НАИМ','ОБЪЕКТ_КЛАСС','ОБЪЕКТ_МЕСТО','МЕСТНОСТЬ',
+  'РАБОТЫ_НАЧАЛО','РАБОТЫ_ОКОНЧАНИЕ','ИСПОЛНИТЕЛЬ_РУК','ОТЧЁТ_НОМЕР','ОТЧЁТ_ДАТА'];
+var PREFILL = {};
+function paintPass(){
+  var D = PPO.load();
+  var lines = R.lines.filter(function(l){ return LINEON[l.name]; });
+  var main = lines.filter(function(l){ return String(l.kv) === '10'; })[0] || lines[0];
+  PREFILL = {
+    'ОБЪЕКТ_НАИМ': main ? (main.name + (lines.length > 1 ? ' с отпайками (' + lines.length + ' линии)' : '')) : '',
+    'ОБЪЕКТ_КЛАСС': R.kvList.join('; '),
+    'ОБЪЕКТ_МЕСТО': R.docName ? R.docName.replace(/\.kmz$/i,'') : '',
+    'РАБОТЫ_НАЧАЛО': R.dateFrom,
+    'РАБОТЫ_ОКОНЧАНИЕ': R.dateTo,
+    'ОТЧЁТ_ДАТА': new Date().toISOString().slice(0,10),
+    'МЕСТНОСТЬ': 'населённая'
+  };
+  $('passForm').innerHTML = '<div class="grid2">' + MIN_FIELDS.map(function(code){
+    var f = PPO.PASSPORT.filter(function(x){ return x.c === code; })[0];
+    if (!f) return '';
+    var v = D.pass[code];
+    if (v === undefined || v === '') v = PREFILL[code] !== undefined ? PREFILL[code] : (f.def || '');
+    var auto = PREFILL[code] !== undefined && PREFILL[code] !== '';
+    var inp;
+    if (f.t === 'date') inp = '<input type="date" data-p="'+code+'" value="'+esc(v)+'">';
+    else if (f.t === 'select' || f.c === 'МЕСТНОСТЬ')
+      inp = '<select data-p="'+code+'">' + PPO.LISTS.mestnost.map(function(o){
+        return '<option'+(o===v?' selected':'')+'>'+esc(o)+'</option>'; }).join('') + '</select>';
+    else inp = '<input type="text" data-p="'+code+'" value="'+esc(v)+'" placeholder="'+esc(f.ph||'')+'">';
+    return '<div class="field"><label>' + esc(f.l) + '<span class="req">•</span></label>' + inp +
+      (auto ? '<div class="hint">подставлено из файла обхода</div>' : (f.h ? '<div class="hint">'+esc(f.h)+'</div>' : '')) +
+      '</div>';
+  }).join('') + '</div>';
+}
+function readPass(){
+  var out = {};
+  Array.prototype.forEach.call($('passForm').querySelectorAll('[data-p]'), function(el){
+    out[el.dataset.p] = el.value;
+  });
+  return out;
+}
+
+/* ------------------------------------------------------------- ШАГ 4 */
+$('runBtn').onclick = function(){
+  var pass = readPass();
+  var miss = MIN_FIELDS.filter(function(c){ return !String(pass[c]||'').trim(); });
+  if (miss.length){
+    toast('Не заполнено полей: ' + miss.length, true);
+    go(3); return;
+  }
+  $('runBtn').disabled = true;
+  run(pass).catch(function(e){
+    $('s4msg').innerHTML = '<span style="color:var(--bad)">Сбой переноса: ' + esc(e.message) + '</span>';
+    $('runBtn').disabled = false;
+  });
+};
+function prog(pct, msg){
+  $('prog').style.width = Math.round(pct) + '%';
+  if (msg) $('s4msg').textContent = msg;
+}
+function run(pass){
+  var D = PPO.blank();
+  D.pass = pass;
+  PPO.PASSPORT.forEach(function(f){
+    if (D.pass[f.c] === undefined && f.def !== undefined) D.pass[f.c] = f.def;
+  });
+  D.pass['РАБОТЫ_МЕТОДЫ'] = PPO.PASSPORT.filter(function(f){ return f.c==='РАБОТЫ_МЕТОДЫ'; })[0].def;
+
+  var use = R.poles.filter(function(p){ return LINEON[p.line] !== false; });
+  use.forEach(function(p){
+    var mark = MARKMAP[p.fieldMark || ''] || '';
+    var note = [];
+    if (p.fieldMark && p.fieldMark !== mark) note.push('по данным осмотра — ' + p.fieldMark);
+    if (p.combined) note.push('совмещённая опора ВЛ 10/0,4 кВ');
+    if (p.note) note.push(p.note);
+    D.poles.push({ id:PPO.uid(), line:p.line, num:p.num, kv:p.kv, mark:mark,
+      span:p.span || '', hangs:0, defect:p.defect, note:note.join('; '),
+      lat:p.lat.toFixed(6), lon:p.lon.toFixed(6), photos:[], _imgs:p.imgs });
+  });
+  /* метки, не ставшие опорами, сохраняем вместе с объектом: без этого
+     они жили только на экране мастера и после переноса терялись */
+  D.skips = (R.skipped || []).map(function(s){
+    return { id:PPO.uid(), raw:s.raw||'', lat:s.lat, lon:s.lon,
+             imgs:(s.imgs||[]).length, photoIds:[], when:s.when||'', _imgs:(s.imgs||[]) };
+  });
+  PPO.replaceAll(D);
+  /* Пролёты приводим к тому же правилу, что и при переносе с карты: расстояние
+     до опоры со следующим номером внутри линии. Разбор по порядку обхода мог
+     давать другой результат там, где обход шёл не по нумерации. */
+  PPO.recalcSpans();
+  D = PPO.load();
+  prog(8, 'Опор перенесено: ' + use.length + '. Готовлю фотографии…');
+
+  /* чистим прежние фото */
+  return PPO.photoAll().then(function(old){
+    return old.reduce(function(c, o){ return c.then(function(){ return PPO.photoDel(o.id); }); }, Promise.resolve());
+  }).then(function(){
+    if (!SRC.zip) return;
+    var jobs = [];
+    D.poles.forEach(function(p){
+      (p._imgs || []).forEach(function(rel){ jobs.push({ pole:p, rel:rel }); });
+    });
+    /* Снимки меток, не ставших опорами, раньше не извлекались: сохранялось
+       только их количество. Архив после мастера уничтожается, поэтому позже,
+       при нажатии «Сделать опорой», доставать было уже неоткуда — карточка
+       получалась без фотографий. Забираем их сразу, вместе с остальными. */
+    D.skips.forEach(function(sk){
+      (sk._imgs || []).forEach(function(rel){ jobs.push({ skip:sk, rel:rel }); });
+    });
+    var total = jobs.length, done = 0;
+    if (!total) return;
+    return jobs.reduce(function(chain, j){
+      return chain.then(function(){
+        var f = SRC.zip.file(j.rel) || SRC.zip.file(decodeURIComponent(j.rel));
+        if (!f){ done++; return; }
+        return f.async('blob').then(function(b){
+          return PPO.photoShrink(b, 1600).then(function(small){
+            var id = PPO.uid();
+            /* у метки без опоры номера и линии ещё нет — привязка проставится
+               при превращении её в опору (PPO.photoRelink) */
+            return PPO.photoPut({ id:id, blob:small,
+                                  pole: j.pole ? j.pole.num : '',
+                                  line: j.pole ? j.pole.line : '',
+                                  at:new Date().toISOString() }).then(function(){
+              if (j.pole) j.pole.photos.push(id);
+              else { j.skip.photoIds.push(id); j.skip.imgs = j.skip.photoIds.length; }
+              done++;
+              prog(8 + 82*done/total, 'Фотографии: ' + done + ' из ' + total);
+            });
+          });
+        }).catch(function(){ done++; });
+      });
+    }, Promise.resolve());
+  }).then(function(){
+    D.poles.forEach(function(p){ delete p._imgs; });
+    D.skips.forEach(function(sk){ delete sk._imgs; });
+    PPO.save();
+    prog(100, 'Готово.');
+    finish();
+  });
+}
+
+/* ------------------------------------------------------------- ШАГ 5 */
+function finish(){
+  var D = PPO.load(), pr = PPO.problems();
+  var stop = pr.filter(function(x){ return x.lv==='stop'; });
+  var warn = pr.filter(function(x){ return x.lv==='warn'; });
+  var nph = D.poles.reduce(function(s,p){ return s + (p.photos||[]).length; }, 0);
+  var bad = D.poles.filter(function(p){ return p.defect && p.defect !== '—'; });
+  var nbad = bad.reduce(function(s,p){ return s + (p.photos||[]).length; }, 0);
+  $('doneCard').innerHTML =
+    '<div class="note ok"><b>Обход перенесён</b>' +
+      'Опор: ' + D.poles.length + ' · фотографий: ' + nph + ' · линий: ' +
+      Object.keys(D.poles.reduce(function(a,p){ a[p.line]=1; return a; }, {})).length + '</div>' +
+    (bad.length
+      ? '<div class="note warn"><b>Опор с дефектами: ' + bad.length + ', снимков к ним: ' + nbad + '</b>' +
+        'Эти фотографии попадут в приложение В отчёта автоматически — подписи с номером опоры, ' +
+        'линией и категорией дефекта проставятся сами. Остальные снимки добавляются кнопкой ' +
+        '«Все фото из осмотра» на странице отчёта.</div>'
+      : '') +
+    (stop.length ? '<div class="note warn"><b>Осталось дозаполнить вручную — ' + stop.length + '</b>' +
+      stop.slice(0,6).map(function(x){ return esc(x.where) + ': ' + esc(x.txt); }).join('<br>') +
+      (stop.length>6 ? '<br>…' : '') +
+      '<br><br>Это измерения и средства измерений — их вносят в разделе «Осмотр». ' +
+      'Отчёт соберётся и без них, но раздел 4 будет пустым.</div>' : '') +
+    '<h3 class="blk">Что дальше</h3>' +
+    '<div class="btnrow">' +
+      '<button class="btn" onclick="toReport()">Собрать отчёт</button>' +
+      '<button class="btn ghost" onclick="location.href=\'osmotr.html#poles\'">Открыть осмотр</button>' +
+      '<button class="btn ghost" onclick="dl()">Сохранить шаблон .xlsx</button>' +
+      '<button class="btn ghost" onclick="location.href=\'pribory.html\'">Внести измерения</button>' +
+    '</div>' +
+    '<div id="dlmsg"></div>';
+  go(5);
+}
+function toReport(){
+  toast('Заполняю шаблон…');
+  PPO.handoff().then(function(){ location.href = 'index.html'; })
+    .catch(function(e){ toast('Ошибка: ' + e.message, true); });
+}
+function dl(){
+  toast('Заполняю шаблон…');
+  PPO.exportXlsx().then(function(r){
+    $('dlmsg').innerHTML = '<div class="note ok" style="margin-top:14px"><b>Сохранён ' + esc(r.name) + '</b>' +
+      (r.fromTemplate ? 'Формулы и выпадающие списки шаблона сохранены.'
+                      : 'Шаблон не найден рядом со страницей — книга собрана значениями.') + '</div>';
+  }).catch(function(e){ toast('Ошибка: ' + e.message, true); });
+}
+</script>
+</body>
+</html>

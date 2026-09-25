@@ -1,0 +1,2200 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Осмотр объекта · ППО ВОЛС</title>
+<link rel="stylesheet" href="ppo-ui.css?v=3.6.3">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="ppo-xlsx.js?v=3.6.3"></script>
+<style>
+.tabs{display:flex;gap:4px;overflow-x:auto;margin-bottom:16px;padding-bottom:3px;-webkit-overflow-scrolling:touch}
+.tabs button{flex:0 0 auto;background:#fff;border:1px solid var(--line-s);border-radius:999px;
+  padding:9px 16px;font-size:13.5px;font-weight:650;color:var(--muted);cursor:pointer;white-space:nowrap}
+.tabs button.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.tabs button .n{display:inline-block;margin-left:6px;background:rgba(0,0,0,.08);border-radius:999px;
+  padding:0 6px;font-size:11.5px}
+.tabs button.on .n{background:rgba(255,255,255,.24)}
+.pane{display:none}
+.pane.on{display:block}
+
+.autobox{background:var(--blue-l);border-radius:10px;padding:13px 15px;margin:0 0 18px}
+.autobox .t{font-size:12px;font-weight:700;color:var(--blue-d);margin-bottom:8px;
+  text-transform:uppercase;letter-spacing:.06em}
+.autobox .g{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.autobox .g div{font-size:13px}
+.autobox .g b{display:block;font-size:17px;font-variant-numeric:tabular-nums;color:var(--blue-d)}
+.autobox .g span{color:var(--muted);font-size:12px}
+
+/* карточки опор */
+.plist{display:grid;grid-template-columns:repeat(auto-fill,minmax(272px,1fr));gap:11px}
+.pcard{background:#fff;border:1px solid var(--line-s);border-radius:11px;padding:13px;cursor:pointer;
+  border-left:4px solid var(--ok);position:relative}
+.pcard:hover{border-color:var(--blue-2)}
+/* Дефектная опора выделяется целиком: в поле карточку видно с одного взгляда. */
+.pcard.bad{background:var(--bad-bg);border-color:var(--bad);border-left-color:var(--bad)}
+.pcard.bad .ln,.pcard.bad .mt,.pcard.bad .ico{color:#7E2323}
+.pcard.bad .no,.pcard.bad .mk{color:var(--bad)}
+.pcard.bad:hover{border-color:#7E2323}
+.pcard.bad .tag.bad{background:var(--bad);color:#fff}
+.pcard.bad .tag.ok,.pcard.bad .tag.warn,.pcard.bad .tag.neutral{background:#fff}
+.pcard.d-A{border-left-color:var(--bad)} .pcard.d-Б{border-left-color:var(--bad)}
+.pcard.d-В{border-left-color:var(--bad)}
+/* Опора, у которой не определён сосед по цепи: без следующей не считается
+   пролёт, без предыдущей — расчётный (ветровой) пролёт. Такую карточку видно
+   в списке сразу, а не после сборки отчёта. Дефект важнее: у дефектной опоры
+   красное оформление сохраняется, а неполнота привязки показывается меткой. */
+.pcard.gap{background:var(--warn-bg);border-color:#E8CD93;border-left-color:var(--warn)}
+.pcard.gap .ln,.pcard.gap .mt,.pcard.gap .ico{color:#6B5417}
+.pcard.gap .no,.pcard.gap .mk{color:#8A6410}
+.pcard.gap:hover{border-color:var(--warn)}
+.pcard.bad.gap{background:var(--bad-bg);border-color:var(--bad)}
+.pcard.bad.gap .ln,.pcard.bad.gap .mt,.pcard.bad.gap .ico{color:#7E2323}
+.pcard.bad.gap .no,.pcard.bad.gap .mk{color:var(--bad)}
+.tag.gap{background:var(--warn);color:#fff}
+
+/* вкладка «Дефекты» */
+.dcard{background:#fff;border:1px solid var(--line-s);border-left:4px solid var(--bad);
+  border-radius:11px;padding:14px;margin-bottom:10px}
+.dcard .dh{display:flex;gap:9px;align-items:baseline;flex-wrap:wrap;margin-bottom:9px}
+.dcard .dh b{font-size:16px}
+.dcard .dh .ln{font-size:12.5px;color:var(--muted)}
+.dcard .dtxt{font-size:13.5px;margin-bottom:10px}
+.dsum{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:4px}
+.dsum div{background:var(--blue-l);border-radius:10px;padding:11px 13px;font-size:12.5px;color:var(--muted)}
+.dsum b{display:block;font-size:19px;color:var(--blue-d);font-variant-numeric:tabular-nums}
+
+/* место расположения: регион — район — населённый пункт */
+.geogrid{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:8px}
+@media(max-width:760px){.geogrid{grid-template-columns:1fr}}
+.geoclim{margin-top:9px;background:var(--blue-l);border-radius:9px;padding:10px 12px;font-size:13px;line-height:1.5}
+.geoclim .mut{color:var(--muted);font-size:12px}
+.geohit{padding:8px 11px;border:1px solid var(--line-s);border-top:0;font-size:13px;cursor:pointer;background:#fff}
+.geohit:first-child{border-top:1px solid var(--line-s);border-radius:9px 9px 0 0}
+.geohit:last-child{border-radius:0 0 9px 9px;margin-bottom:9px}
+.geohit:hover{background:var(--blue-l)}
+.geohit .mut{color:var(--muted)}
+
+/* автоматические выводы по нескольким классам напряжения */
+.kvtab{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px}
+.kvtab th,.kvtab td{border:1px solid #CBDCEA;padding:6px 8px;text-align:center}
+.kvtab th{background:#fff;font-weight:700;color:var(--blue-d);font-size:11.5px}
+.kvtab td:first-child,.kvtab th:first-child{text-align:left}
+.kvtab tbody tr:nth-child(odd){background:rgba(255,255,255,.55)}
+.kvtab .n{font-variant-numeric:tabular-nums}
+
+/* пропущенные метки KMZ */
+.skiprow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--warn-bg);
+  border:1px solid #E8D5AC;border-radius:10px;padding:10px 12px;margin-bottom:7px}
+.skiprow .nm{font-weight:650;font-size:13.5px;flex:1 1 190px;word-break:break-word}
+.skiprow .why{display:block;font-weight:400;font-size:11.5px;color:var(--bad);margin-top:2px}
+.skiprow .co{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.pcard .no{font-size:17px;font-weight:800;letter-spacing:-.01em}
+.pcard .ln{font-size:12.5px;color:var(--muted);margin-bottom:7px}
+.pcard .mk{font-size:13px;font-weight:600}
+.pcard .mt{font-size:12px;color:var(--muted);margin-top:2px}
+.pcard .bot{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;align-items:center}
+.pcard .ico{font-size:11.5px;color:var(--muted)}
+
+/* строки измерений */
+.mrow{background:#fff;border:1px solid var(--line-s);border-radius:10px;padding:12px 13px;margin-bottom:8px;
+  display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;cursor:pointer}
+.mrow:hover{border-color:var(--blue-2)}
+.mrow .nm{font-size:14px;font-weight:650}
+.mrow .meta{font-size:12.5px;color:var(--muted);margin-top:3px}
+.mrow .val{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.mrow .val small{font-size:12px;font-weight:600;color:var(--muted);margin-left:3px}
+
+.sirow{background:#fff;border:1px solid var(--line-s);border-radius:10px;padding:12px 13px;margin-bottom:8px}
+.sirow .top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+
+.photos{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+.photos figure{margin:0;position:relative;width:74px;height:74px;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+.photos img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
+.ico.ph{cursor:zoom-in}
+.ico.ph:hover{background:#E7F0FA;border-radius:5px}
+.photos figure:hover img{filter:brightness(1.06)}
+.photos figure{cursor:zoom-in}
+.photos figure:focus{outline:2px solid var(--brand);outline-offset:2px}
+.phwarn{font-size:12.5px;color:#8A5A00;background:#FDF7EC;border:1px solid #EAD3A8;
+  border-radius:8px;padding:9px 11px;line-height:1.45}
+#lightbox{position:fixed;inset:0;z-index:2000;background:rgba(4,10,18,.94);display:none;align-items:center;justify-content:center;flex-direction:column}
+#lightbox.on{display:flex}
+#lightbox img{max-width:92vw;max-height:80vh;border-radius:10px;box-shadow:0 12px 46px rgba(0,0,0,.6)}
+.lb-close{position:absolute;top:14px;right:18px;font-size:30px;line-height:1;color:#fff;background:none;border:0;cursor:pointer}
+.lb-nav{position:absolute;top:50%;transform:translateY(-50%);font-size:30px;color:#fff;background:rgba(0,0,0,.35);border:0;cursor:pointer;padding:8px 16px;border-radius:10px}
+.lb-prev{left:14px}.lb-next{right:14px}
+.lb-cap{color:#c9d4e0;margin-top:12px;font-size:12.5px;font-family:var(--mono);max-width:90vw;text-align:center;word-break:break-all}
+.lb-stage{max-width:92vw;max-height:80vh;overflow:hidden;display:flex;align-items:center;justify-content:center;touch-action:none}
+#lightbox img{max-width:92vw;max-height:80vh;transform-origin:center center;cursor:grab;will-change:transform;user-select:none;-webkit-user-drag:none}
+#lightbox img.grabbing{cursor:grabbing}
+.lb-zoombar{position:absolute;top:14px;left:18px;display:flex;gap:6px;z-index:5}
+.lb-zoombar button{width:36px;height:36px;border:0;border-radius:8px;background:rgba(0,0,0,.42);color:#fff;font-size:19px;line-height:1;cursor:pointer}
+.lb-zoombar button:hover{background:rgba(0,0,0,.65)}
+.photos button{position:absolute;top:2px;right:2px;width:20px;height:20px;border-radius:50%;border:0;
+  background:rgba(0,0,0,.6);color:#fff;font-size:12px;line-height:1;cursor:pointer;padding:0}
+
+.mini{font-size:12.5px;color:var(--muted)}
+.stickybar{position:sticky;bottom:0;background:linear-gradient(to top,var(--bg) 68%,rgba(241,245,249,0));
+  padding:14px 0 10px;margin-top:6px;z-index:20}
+.searchbox{width:100%;padding:10px 13px;border:1px solid var(--line);border-radius:9px;margin-bottom:12px}
+.vpreview{border-radius:9px;padding:12px 13px;margin-top:12px;font-size:13.5px;border:1px solid var(--line-s)}
+.vpreview b{display:block;font-size:16px;margin-bottom:3px}
+.vpreview.ok{background:var(--ok-bg);border-color:#B9DFD6} .vpreview.ok b{color:var(--ok)}
+.vpreview.bad{background:var(--bad-bg);border-color:#E9C3C3} .vpreview.bad b{color:var(--bad)}
+.vpreview.idle{background:#F7FAFC;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<header class="ppo-top"><div class="ppo-top-in">
+  <div class="ppo-mark">ППО</div>
+  <div class="ppo-brand"><b>Осмотр объекта</b><span id="objline">объект не задан</span></div>
+  <nav id="ppoNav"></nav>
+</div></header>
+
+<div class="wrap">
+
+  <div class="tabs" id="tabs"></div>
+
+  <!-- ============================================================ ОБЪЕКТ -->
+  <section class="pane" id="p-obj">
+    <div class="autobox" id="autobox"></div>
+    <div id="passForm"></div>
+  </section>
+
+  <!-- ============================================================= ЛИНИИ -->
+  <section class="pane" id="p-lines">
+    <div class="card">
+      <h2>Линии в границах запроса</h2>
+      <p class="sub">Объект «ВЛ 0,4-10 кВ» одним лотом — недопустимое описание: под ним скрывается несколько
+         линий с разными инвентарными номерами и основаниями права. Опишите каждую отдельно.
+         Наименование должно точно совпадать с тем, что вы пишете в карточках опор.</p>
+      <div class="btnrow">
+        <button class="btn" id="lineAdd">+ Добавить линию</button>
+        <button class="btn ghost" id="lineFromPoles">Собрать из заведённых опор</button>
+      </div>
+      <div id="lineList" style="margin-top:14px"></div>
+    </div>
+  </section>
+
+  <!-- ============================================================= ОПОРЫ -->
+  <section class="pane" id="p-poles">
+    <div class="card">
+      <h2>Опоры</h2>
+      <p class="sub">Одна карточка — одна опора. Марка подставляет материал, тип и допустимый момент;
+         категория дефекта — состояние по ГОСТ 31937-2024 и вывод о технологической возможности.</p>
+      <div class="btnrow">
+        <button class="btn" onclick="poleNew()">+ Добавить опору</button>
+        <button class="btn ghost" onclick="batchOpen()">Добавить пачкой</button>
+        <button class="btn ghost" onclick="location.href='karta.html'">Взять с карты</button>
+        <button class="btn ghost sm" onclick="poleSort()">Упорядочить по номеру</button>
+        <button class="btn ghost sm" onclick="spansRecalc()">Пересчитать пролёты по координатам</button>
+      </div>
+    </div>
+    <div class="card" id="skipCard" style="display:none">
+      <h2>Метки, не ставшие опорами</h2>
+      <p class="sub">При импорте KMZ подпись этих меток начиналась не с номера опоры,
+         поэтому карточки по ним не заведены. Проверьте, не потерялось ли нужное:
+         метку можно превратить в опору или убрать из списка.</p>
+      <div class="btnrow" style="margin-bottom:12px">
+        <button class="btn sm" onclick="skipsAdoptAll()">Добавить все в список</button>
+        <button class="btn ghost sm" onclick="skipsClear()">Убрать все из списка</button>
+      </div>
+      <div id="skipList"></div>
+    </div>
+    <input class="searchbox" id="pSearch" placeholder="Поиск по номеру опоры, линии, марке…" oninput="paintPoles()">
+    <div id="poleList"></div>
+  </section>
+
+  <!-- =========================================================== ДЕФЕКТЫ -->
+  <section class="pane" id="p-def">
+    <div class="card">
+      <h2>Дефекты</h2>
+      <p class="sub">Здесь по каждому дефекту уточняется описание из осмотра, назначается исполнитель
+         мероприятия, срок и ориентировочная стоимость. Эти сведения идут в приложения В и Е отчёта.</p>
+      <div class="btnrow">
+        <button class="btn" onclick="defAdd()">+ Отметить дефект на опоре</button>
+        <button class="btn ghost sm" onclick="go('poles')">Перейти к опорам</button>
+      </div>
+      <div class="dsum" id="defSum" style="margin-top:14px"></div>
+    </div>
+    <div id="defList"></div>
+  </section>
+
+  <!-- ====================================================== МЕРОПРИЯТИЯ -->
+  <section class="pane" id="p-act">
+    <div class="card">
+      <h2>Мероприятия</h2>
+      <p class="sub">Перечень приложения Е отчёта. Позиции выводятся сами — из дефектов опор
+         и измерений с отрицательным выводом; здесь по каждой назначается исполнитель, срок
+         и ориентировочная стоимость. Можно добавить позицию вручную или снять лишнюю.</p>
+      <div class="btnrow">
+        <button class="btn" onclick="actNew()">+ Добавить мероприятие</button>
+        <button class="btn ghost sm" onclick="actResetAll()">Сбросить все правки</button>
+      </div>
+      <div class="dsum" id="actSum" style="margin-top:14px"></div>
+      <div class="note" style="margin-top:12px"><b>Группа определяется причиной, а не исполнителем</b>
+        Е.1 — мероприятие вызвано намерением разместить сеть электросвязи;
+        Е.2 — состояние объекта, существовавшее до заявления о предоставлении доступа.
+        Исполнитель назначается отдельно и группу не меняет.</div>
+    </div>
+    <div id="actList"></div>
+  </section>
+
+  <!-- ========================================================= ИЗМЕРЕНИЯ -->
+  <section class="pane" id="p-meas">
+    <div class="card">
+      <h2>Измерения</h2>
+      <p class="sub">Вводится только замеренное число. Норматив подставляется по классу напряжения,
+         характеру местности и типовому проекту, вывод считается сам.</p>
+      <div class="btnrow">
+        <button class="btn" onclick="measNew()">+ Добавить измерение</button>
+        <button class="btn ghost" onclick="location.href='pribory.html'">Открыть приборные калькуляторы</button>
+      </div>
+    </div>
+    <div id="measList"></div>
+  </section>
+
+  <!-- ============================================================== СИ -->
+  <section class="pane" id="p-si">
+    <div class="card">
+      <h2>Средства измерений</h2>
+      <p class="sub">Без действующей поверки результаты измерений в отчёт не принимаются
+         (приказ Минпромторга № 2510, ФГИС «Аршин»).</p>
+      <div class="btnrow"><button class="btn" onclick="siNew()">+ Добавить прибор</button></div>
+    </div>
+    <div id="siList"></div>
+  </section>
+
+  <!-- ========================================================== КАБЕЛИ -->
+  <section class="pane" id="p-cab">
+    <div class="card">
+      <h2>Размещаемые кабели</h2>
+      <p class="sub">Что оператор просит разместить. Диаметр, масса и тяжение берутся из справочника марок.</p>
+      <div class="btnrow"><button class="btn" onclick="cabNew()">+ Добавить кабель</button></div>
+      <div id="cabList" style="margin-top:14px"></div>
+    </div>
+    <div class="card">
+      <h2>Существующая подвеска</h2>
+      <p class="sub">Провода, грозотрос и ранее размещённые кабели связи. Нужны для оценки
+         несущей способности опор (приложение Ж отчёта).</p>
+      <div class="btnrow"><button class="btn" onclick="wirNew()">+ Добавить позицию</button></div>
+      <div id="wirList" style="margin-top:14px"></div>
+    </div>
+  </section>
+
+  <!-- ======================================================== ПРОВЕРКА -->
+  <section class="pane" id="p-out">
+    <div class="card" id="readyCard"></div>
+    <div class="card">
+      <h2>Файл исходных данных</h2>
+      <p class="sub">Главный формат — <b>ID_shablon.xlsx</b>. Эта форма заполняет его жёлтые ячейки;
+         материал опор, состояние, мероприятия и Блок 1 листа «Нагрузки» досчитывает сам Excel
+         по своим формулам. Отчёт всегда собирается из этой книги.</p>
+      <div class="btnrow">
+        <button class="btn" onclick="toReport()">Собрать отчёт по этим данным</button>
+        <button class="btn ghost" onclick="dlXlsx()">Сохранить заполненный шаблон (.xlsx)</button>
+        <button class="btn ghost" onclick="document.getElementById('impXls').click()">Загрузить шаблон Excel</button>
+        <input type="file" id="impXls" accept=".xlsx,.xlsm" hidden>
+        <button class="btn ghost" id="btnBackup">Резервная копия (.json)</button>
+        <button class="btn ghost" onclick="document.getElementById('impJson').click()">Восстановить из копии</button>
+        <input type="file" id="impJson" accept=".json" hidden>
+      </div>
+      <p class="mini" style="margin:10px 0 0">Копия содержит и фотографии осмотра, поэтому файл может весить
+         десятки мегабайт. Восстановление полностью заменяет текущий осмотр.</p>
+      <div id="xlsMsg"></div>
+    </div>
+    <div class="card">
+      <h2>Границы работ</h2>
+      <p class="sub">Что входит в отчёт, а что — предмет проекта оператора.</p>
+      <div class="note"><b>В отчёт входит</b>
+        Визуальный осмотр с категорией состояния по ГОСТ 31937-2024, инструментальные измерения,
+        учёт ранее размещённых элементов сетей связи, сводная оценка технологической возможности.</div>
+      <div class="note warn"><b>В проектную документацию пользователя</b>
+        Поверочные расчёты нагрузок, выбор марок кабеля и арматуры, точки и высоты подвеса,
+        стрелы провеса и тяжения, технические решения по устранению дефектов.
+        Основание — пункты 5.1 и 6 ТТ № 282р.</div>
+    </div>
+  </section>
+
+</div>
+
+<!-- ============================================================ МОДАЛКА -->
+<div class="modal" id="modal"><div class="modal-in">
+  <div class="modal-h"><h3 id="mTitle"></h3><button class="x" onclick="mClose()">✕</button></div>
+  <div class="modal-b" id="mBody"></div>
+  <div class="modal-f" id="mFoot"></div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<div id="lightbox" onclick="if(event.target.id==='lightbox')closeLightbox()">
+  <button class="lb-close" onclick="closeLightbox()">✕</button>
+  <div class="lb-zoombar">
+    <button onclick="lbZoom(-1)" title="Уменьшить">−</button>
+    <button onclick="lbZoomReset()" title="Сбросить">⟳</button>
+    <button onclick="lbZoom(1)" title="Увеличить">+</button>
+  </div>
+  <button class="lb-nav lb-prev" onclick="lbPrev()">‹</button>
+  <div class="lb-stage" id="lbStage"><img id="lbImg" alt=""></div>
+  <button class="lb-nav lb-next" onclick="lbNext()">›</button>
+  <div class="lb-cap" id="lbCap"></div>
+</div>
+
+<script src="ppo-core.js?v=3.6.3"></script>
+<script src="ppo-refs.js?v=3.6.3"></script>
+<script src="ppo-geo.js?v=3.6.3"></script>
+<script>
+'use strict';
+var D = PPO.load();
+/* Пролёты и протяжённость — величины производные от координат. Пересчитываем
+   при открытии раздела, иначе список опор и паспорт показывают значения,
+   оставшиеся от прежнего состава опор. */
+try { if (D.poles && D.poles.length){ PPO.recalcSpans(); D = PPO.load(); } } catch (e) {}
+
+/* --------------------------------------------------------------- утилиты */
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s===undefined||s===null?'':s)
+  .replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function toast(m,bad){ var t=$('toast'); t.textContent=m; t.className='toast on'+(bad?' bad':'');
+  setTimeout(function(){t.className='toast';},2600); }
+function commit(){
+  var ok = PPO.save();
+  paintAll();
+  if (ok === false) toast('ВНИМАНИЕ: данные не сохранены — в браузере нет места. Выгрузите книгу Excel, пока сведения не потеряны.', true);
+}
+/* ядро сообщает, что сохранить не удалось либо что пришлось сбросить кэш карты */
+document.addEventListener('ppo:savefail', function(){
+  toast('Данные осмотра не сохранены: переполнено хранилище браузера. Немедленно выгрузите книгу Excel на вкладке «Проверка и выгрузка».', true);
+});
+document.addEventListener('ppo:cachedropped', function(){
+  toast('Не хватало места — сброшен кэш меток карты. Данные осмотра сохранены.');
+});
+/* Объект изменён в другой вкладке — как правило, на карте.
+   Раньше страница читала объект один раз при загрузке, и опора, добавленная
+   на карте, здесь не появлялась до перезагрузки. Подхватываем изменения на
+   лету: правки, начатые в открытой карточке, при этом не теряются — форма
+   остаётся как есть, обновляются только списки. */
+document.addEventListener('ppo:external', function(e){
+  var was = (D.poles || []).length;
+  D = PPO.load();
+  paintAll();
+  var now = (D.poles || []).length, diff = now - was;
+  toast(diff > 0 ? ('Из карты добавлено опор: ' + diff + ' (всего ' + now + ')')
+                 : 'Данные обновлены из карты (опор: ' + now + ')');
+});
+
+/* --------------------------------------------------------------- вкладки */
+var TABS = [
+  { id:'obj',   t:'Объект',    n:function(){ return ''; } },
+  { id:'lines', t:'Линии',     n:function(){ return D.lines.length || ''; } },
+  { id:'poles', t:'Опоры',     n:function(){ return D.poles.length || ''; } },
+  { id:'meas',  t:'Измерения', n:function(){ return D.meas.length || ''; } },
+  { id:'def',   t:'Дефекты',   n:function(){
+      return D.poles.filter(function(p){ return p.defect && p.defect !== '—'; }).length || ''; } },
+  { id:'act',   t:'Мероприятия', n:function(){
+      try { return PPO.buildActs().length || ''; } catch(e){ return ''; } } },
+  { id:'si',    t:'Приборы',   n:function(){ return D.si.length || ''; } },
+  { id:'cab',   t:'Кабели',    n:function(){ return (D.cables.length+D.wires.length) || ''; } },
+  { id:'out',   t:'Проверка и выгрузка', n:function(){ return ''; } }
+];
+var cur = location.hash.replace('#','') || 'obj';
+function paintTabs(){
+  $('tabs').innerHTML = TABS.map(function(t){
+    var n = t.n();
+    return '<button data-t="'+t.id+'"'+(t.id===cur?' class="on"':'')+'>'+t.t+
+           (n?'<span class="n">'+n+'</span>':'')+'</button>';
+  }).join('');
+  Array.prototype.forEach.call($('tabs').querySelectorAll('button'), function(b){
+    b.onclick = function(){ go(b.dataset.t); };
+  });
+}
+function go(id){
+  cur = id; location.hash = id;
+  TABS.forEach(function(t){ $('p-'+t.id).classList.toggle('on', t.id===id); });
+  paintTabs();
+  if (id==='out') paintReady();
+  window.scrollTo(0,0);
+}
+
+/* ============================================================ 1. ОБЪЕКТ */
+function paintPass(){
+  var html = '';
+  PPO.PASS_GROUPS.forEach(function(g){
+    html += '<div class="card"><div class="eyebrow">'+esc(g)+'</div>';
+    html += '<div class="grid2">';
+    PPO.PASSPORT.filter(function(f){ return f.g===g && !f.hide; }).forEach(function(f){
+      var v = D.pass[f.c];
+      if (v === undefined && f.def !== undefined) v = f.def;
+      var miss = f.req && String(v||'').trim()==='';
+      html += '<div class="field'+(miss?' miss':'')+'" data-c="'+f.c+'">';
+      html += '<label>'+esc(f.l)+(f.req?'<span class="req">•</span>':'')+'</label>';
+      if (f.t==='area')
+        html += '<textarea data-p="'+f.c+'" placeholder="'+esc(f.ph||'')+'">'+esc(v||'')+'</textarea>';
+      else if (f.t==='date')
+        html += '<input type="date" data-p="'+f.c+'" value="'+esc(v||'')+'">';
+      else if (f.t==='select')
+        html += '<select data-p="'+f.c+'"><option value=""></option>'+f.opts.map(function(o){
+          return '<option'+(o===v?' selected':'')+'>'+esc(o)+'</option>'; }).join('')+'</select>';
+      else if (f.t==='geo')
+        html += '<div class="geobox" data-geo="1"></div>';
+      else if (f.t==='calc'){
+        /* Расчётная величина: показываем, но вводить не даём — иначе в отчёт
+           попадают два разных числа об одном и том же. */
+        html += '<input type="text" data-p="'+f.c+'" value="'+esc(v||'')+'" readonly>';
+      }
+      else if (f.t==='lines'){
+        /* Объект обследования почти всегда складывается из нескольких фидеров.
+           Перечислять их руками — источник расхождения между наименованием
+           объекта и таблицами опор. Линии подтягиваются из самого проекта. */
+        html += '<input type="text" data-p="'+f.c+'" value="'+esc(v||'')+'" placeholder="'+esc(f.ph||'')+'">';
+        html += '<div class="lines-pick" data-lines="'+f.c+'"></div>';
+      }
+      else if (f.t==='kv')
+        html += '<div class="chips" data-kv="1">'+PPO.LISTS.kv.map(function(k){
+          var on = String(v||'').split(';').map(function(x){return x.trim();}).indexOf(k)>=0;
+          return '<span class="chip'+(on?' on':'')+'" data-k="'+k+'">'+k+' кВ</span>'; }).join('')+'</div>';
+      else
+        html += '<input type="text" data-p="'+f.c+'" value="'+esc(v||'')+'" placeholder="'+esc(f.ph||'')+'">';
+      if (f.h) html += '<div class="hint">'+esc(f.h)+'</div>';
+      html += '</div>';
+    });
+    html += '</div></div>';
+  });
+  $('passForm').innerHTML = html;
+  mountGeo();
+  mountLines();
+
+  Array.prototype.forEach.call($('passForm').querySelectorAll('[data-p]'), function(el){
+    el.oninput = el.onchange = function(){
+      D.pass[el.dataset.p] = el.value;
+      el.closest('.field').classList.toggle('miss', !!el.closest('.field').querySelector('.req') && !el.value.trim());
+      PPO.save(); paintAuto(); paintObjLine();
+    };
+  });
+  Array.prototype.forEach.call($('passForm').querySelectorAll('[data-kv] .chip'), function(el){
+    el.onclick = function(){
+      el.classList.toggle('on');
+      var box = el.parentNode, sel = [];
+      Array.prototype.forEach.call(box.querySelectorAll('.chip.on'), function(c){ sel.push(c.dataset.k); });
+      D.pass['ОБЪЕКТ_КЛАСС'] = sel.join('; ');
+      box.closest('.field').classList.toggle('miss', !sel.length);
+      PPO.save(); paintAuto();
+    };
+  });
+}
+/* ================================ ЛИНИИ ПРОЕКТА В НАИМЕНОВАНИИ ОБЪЕКТА
+   Все линии, встречающиеся у опор проекта и на вкладке «Линии», выводятся
+   отметками под полем. Отмеченные складываются в наименование объекта через
+   «; ». Поле остаётся редактируемым вручную: наименование в договоре может
+   отличаться от полевого обозначения фидера.                              */
+function objNameParts(){
+  return String(D.pass['ОБЪЕКТ_НАИМ']||'').split(';')
+    .map(function(x){ return x.trim(); }).filter(Boolean);
+}
+function mountLines(){
+  var box = $('passForm').querySelector('[data-lines]');
+  if (!box) return;
+  var code = box.dataset.lines;
+  var all = PPO.projectLines();
+  var inp = box.closest('.field').querySelector('[data-p="'+code+'"]');
+
+  if (!all.length){
+    box.innerHTML = '<div class="hint">Линии подтянутся сюда, как только в проекте появятся опоры ' +
+      '(импорт KMZ, карта или ручной ввод).</div>';
+    return;
+  }
+  /* поле пустое, а линии в проекте есть — подставляем все сразу */
+  if (!String(D.pass[code]||'').trim()){
+    D.pass[code] = all.join('; ');
+    if (inp) inp.value = D.pass[code];
+    PPO.save();
+  }
+  function paint(){
+    var have = objNameParts().map(function(x){ return x.toLowerCase(); });
+    box.innerHTML = '<div class="chips">' + all.map(function(l){
+      var on = have.indexOf(l.toLowerCase()) >= 0;
+      return '<span class="chip'+(on?' on':'')+'" data-l="'+esc(l)+'">'+esc(l)+'</span>';
+    }).join('') + '</div>' +
+    '<div class="btnrow" style="margin-top:6px">' +
+      '<button class="btn ghost sm" id="ln_all">Подставить все линии ('+all.length+')</button>' +
+      '<button class="btn ghost sm" id="ln_clr">Очистить</button></div>' +
+    '<div class="hint">Линий в проекте: '+all.length+'. Отметка добавляет линию в наименование объекта.</div>';
+
+    Array.prototype.forEach.call(box.querySelectorAll('.chip'), function(el){
+      el.onclick = function(){
+        var l = el.dataset.l, parts = objNameParts();
+        var i = parts.map(function(x){ return x.toLowerCase(); }).indexOf(l.toLowerCase());
+        if (i >= 0) parts.splice(i, 1); else parts.push(l);
+        setName(parts.join('; '));
+      };
+    });
+    $('ln_all').onclick = function(e){ e.preventDefault(); setName(all.join('; ')); };
+    $('ln_clr').onclick = function(e){ e.preventDefault(); setName(''); };
+  }
+  function setName(v){
+    D.pass[code] = v;
+    if (inp){
+      inp.value = v;
+      inp.closest('.field').classList.toggle('miss', !v.trim());
+    }
+    PPO.save(); paint(); paintAuto(); paintObjLine();
+  }
+  if (inp) inp.addEventListener('input', function(){ paint(); });
+  paint();
+}
+
+/* ============================================ МЕСТО РАСПОЛОЖЕНИЯ И КЛИМАТ
+   Свободный текст заменён выбором из справочника: регион → муниципальный
+   район (городской округ) → населённый пункт. Климатический район
+   определяется по РАЙОНУ: картами ПУЭ-7 районируется территория, отдельные
+   населённые пункты в них не перечислены.
+   Подставленные значения климата остаются редактируемыми — они
+   предварительные и подтверждаются по картам при нормоконтроле.           */
+var CLIM_FIELDS = ['ВЕТЕР_РАЙОН','ВЕТЕР_ДАВЛЕНИЕ','ГОЛОЛЁД_РАЙОН','ГОЛОЛЁД_СТЕНКА','МЕСТНОСТЬ_ТИП','СЕЙСМИКА'];
+
+function mountGeo(){
+  var box = $('passForm').querySelector('[data-geo]');
+  if (!box) return;
+  if (typeof PPOGEO === 'undefined'){
+    box.innerHTML = '<input type="text" data-p="ОБЪЕКТ_МЕСТО" value="' + esc(D.pass['ОБЪЕКТ_МЕСТО']||'') +
+      '" placeholder="район, населённый пункт">' +
+      '<div class="hint">Справочник районов не загружен (файл ppo-geo.js) — ввод свободным текстом.</div>';
+    return;
+  }
+  /* разбор ранее введённого свободного текста — чтобы не заполнять заново */
+  var guessed = null;
+  if (!D.pass['ОБЪЕКТ_РАЙОН'] && String(D.pass['ОБЪЕКТ_МЕСТО']||'').trim()){
+    guessed = PPOGEO.parsePlace(D.pass['ОБЪЕКТ_МЕСТО']);
+    if (guessed){
+      D.pass['ОБЪЕКТ_РЕГИОН'] = guessed.reg;
+      D.pass['ОБЪЕКТ_РАЙОН']  = guessed.dist;
+      if (guessed.point && !D.pass['ОБЪЕКТ_НП']) D.pass['ОБЪЕКТ_НП'] = guessed.point;
+    }
+  }
+  var reg = D.pass['ОБЪЕКТ_РЕГИОН'] || PPOGEO.regions()[0];
+  var dis = D.pass['ОБЪЕКТ_РАЙОН'] || '';
+  var pnt = D.pass['ОБЪЕКТ_НП'] || '';
+
+  function opts(list, cur, ph){
+    return '<option value="">' + ph + '</option>' + list.map(function(x){
+      return '<option' + (x===cur ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join('');
+  }
+  box.innerHTML =
+    '<input type="text" id="g_find" class="searchbox" style="margin:0 0 8px" ' +
+      'placeholder="Найти населённый пункт по названию…" autocomplete="off">' +
+    '<div id="g_hits"></div>' +
+    '<div class="geogrid">' +
+      '<select id="g_reg">' + opts(PPOGEO.regions(), reg, '— регион —') + '</select>' +
+      '<select id="g_dis">' + opts(PPOGEO.districts(reg), dis, '— район / городской округ —') + '</select>' +
+      '<input type="text" id="g_pnt" list="g_pl" value="' + esc(pnt) + '" placeholder="населённый пункт" autocomplete="off">' +
+      '<datalist id="g_pl">' + PPOGEO.points(reg, dis).map(function(x){
+        return '<option value="' + esc(x) + '">'; }).join('') + '</datalist>' +
+    '</div>' +
+    '<div class="geoclim" id="g_clim"></div>';
+
+  function place(){
+    return PPOGEO.composePlace($('g_reg').value, $('g_dis').value, $('g_pnt').value.trim());
+  }
+  function showClim(){
+    var c = PPOGEO.climate($('g_reg').value, $('g_dis').value);
+    if (!c){ $('g_clim').innerHTML = '<span class="mut">Выберите район — подставятся ветровой и гололёдный районы.</span>'; return; }
+    $('g_clim').innerHTML =
+      '<b>Ветровой район ' + esc(c.wind) + '</b> · W₀ = ' + c.w0 + ' Па&nbsp;&nbsp;' +
+      '<b>Гололёдный район ' + esc(c.ice) + '</b> · стенка ' + c.b + ' мм&nbsp;&nbsp;' +
+      '<span class="mut">сейсмичность ' + c.seis + ' баллов</span>' +
+      '<div class="mut" style="margin-top:5px">Значения предварительные, сняты с карт районирования ПУЭ-7 ' +
+      '(табл. 2.5.1, 2.5.3). Перед выпуском отчёта подтвердите по картам — поля вкладки «Климат» редактируются.</div>';
+  }
+  function applyClim(){
+    var c = PPOGEO.climate($('g_reg').value, $('g_dis').value);
+    if (!c) return;
+    D.pass['ВЕТЕР_РАЙОН'] = c.wind;
+    D.pass['ВЕТЕР_ДАВЛЕНИЕ'] = String(c.w0);
+    D.pass['ГОЛОЛЁД_РАЙОН'] = c.ice;
+    D.pass['ГОЛОЛЁД_СТЕНКА'] = String(c.b);
+    D.pass['МЕСТНОСТЬ_ТИП'] = c.ter;
+    D.pass['СЕЙСМИКА'] = String(c.seis);
+    D.pass['КЛИМАТ_ИСТОЧНИК'] = 'карты климатического районирования ПУЭ-7 (табл. 2.5.1, 2.5.3) по ' +
+      c.dist + '; СП 131.13330.2020';
+  }
+  function commitPlace(){
+    D.pass['ОБЪЕКТ_РЕГИОН'] = $('g_reg').value;
+    D.pass['ОБЪЕКТ_РАЙОН']  = $('g_dis').value;
+    D.pass['ОБЪЕКТ_НП']     = $('g_pnt').value.trim();
+    D.pass['ОБЪЕКТ_МЕСТО']  = place();
+    PPO.save();
+  }
+  $('g_reg').onchange = function(){
+    D.pass['ОБЪЕКТ_РАЙОН'] = ''; D.pass['ОБЪЕКТ_НП'] = '';
+    D.pass['ОБЪЕКТ_РЕГИОН'] = $('g_reg').value;
+    PPO.save(); paintPass(); paintAuto(); paintObjLine();
+  };
+  $('g_dis').onchange = function(){
+    commitPlace(); applyClim();
+    PPO.save(); paintPass(); paintAuto(); paintObjLine();
+    toast($('g_dis').value ? 'Климатический район подставлен по справочнику — проверьте на вкладке «Климат»'
+                           : 'Район не выбран');
+  };
+  $('g_pnt').oninput = function(){ commitPlace(); paintObjLine(); };
+  $('g_find').oninput = function(){
+    var q = $('g_find').value.trim();
+    if (q.length < 2){ $('g_hits').innerHTML = ''; return; }
+    var hits = PPOGEO.findPoint(q);
+    if (!hits.length){
+      $('g_hits').innerHTML = '<div class="geohit mut">Не найдено. Выберите район вручную ' +
+        'и впишите населённый пункт — справочник охватывает не все населённые пункты.</div>';
+      return;
+    }
+    $('g_hits').innerHTML = hits.slice(0, 12).map(function(h, i){
+      return '<div class="geohit" data-h="' + i + '"><b>' + esc(h.point) + '</b> · ' +
+             esc(h.dist) + ' · <span class="mut">' + esc(h.reg) + '</span></div>'; }).join('');
+    Array.prototype.forEach.call($('g_hits').querySelectorAll('[data-h]'), function(el){
+      el.onclick = function(){
+        var h = hits[+el.dataset.h];
+        D.pass['ОБЪЕКТ_РЕГИОН'] = h.reg;
+        D.pass['ОБЪЕКТ_РАЙОН']  = h.dist;
+        D.pass['ОБЪЕКТ_НП']     = h.point;
+        D.pass['ОБЪЕКТ_МЕСТО']  = PPOGEO.composePlace(h.reg, h.dist, h.point);
+        var c = PPOGEO.climate(h.reg, h.dist);
+        if (c){
+          D.pass['ВЕТЕР_РАЙОН'] = c.wind; D.pass['ВЕТЕР_ДАВЛЕНИЕ'] = String(c.w0);
+          D.pass['ГОЛОЛЁД_РАЙОН'] = c.ice; D.pass['ГОЛОЛЁД_СТЕНКА'] = String(c.b);
+          D.pass['МЕСТНОСТЬ_ТИП'] = c.ter; D.pass['СЕЙСМИКА'] = String(c.seis);
+          D.pass['КЛИМАТ_ИСТОЧНИК'] = 'карты климатического районирования ПУЭ-7 (табл. 2.5.1, 2.5.3) по ' +
+            c.dist + '; СП 131.13330.2020';
+        }
+        PPO.save(); paintPass(); paintAuto(); paintObjLine();
+        toast('Место расположения и климатический район заполнены — проверьте вкладку «Климат»');
+      };
+    });
+  };
+  showClim();
+  if (guessed){
+    PPO.save();
+    $('g_clim').insertAdjacentHTML('afterbegin',
+      '<div class="mut" style="margin-bottom:6px">Прежняя запись «' + esc(guessed.rest) +
+      '» распознана как район из справочника. Проверьте выбор; климат по ней автоматически не менялся.</div>');
+  }
+}
+
+/* Нормативы показываем ПО КАЖДОМУ отмеченному классу напряжения.
+   Прежде выводился только наибольший класс объекта, и на смешанном участке
+   0,4/10 кВ казалось, будто всё считается по 10 кВ. Расчёт по каждой опоре
+   ведётся по её собственному классу (PPO.ctxForPole). */
+function paintAuto(){
+  var c = PPO.ctx();
+  var list = PPO.kvUsed().filter(function(k){ return !!PPO.vlByKv(k); });
+  if (!list.length){
+    $('autobox').innerHTML = '<div class="t">Считается автоматически</div>' +
+      '<div class="mini">Отметьте класс напряжения — сюда подставятся нормируемые габариты, ' +
+      'расстояние ОКСН–провод и охранная зона.</div>';
+    return;
+  }
+  var nas = !/ненасел|труднодост/.test(String(D.pass['МЕСТНОСТЬ']||'').toLowerCase());
+  var byKv = {};
+  D.poles.forEach(function(p){ var k = String(p.kv||'').trim(); if (k) byKv[k] = (byKv[k]||0)+1; });
+  var noKv = D.poles.filter(function(p){ return !String(p.kv||'').trim(); }).length;
+
+  if (list.length === 1){
+    var r = PPO.vlByKv(list[0]);
+    $('autobox').innerHTML = '<div class="t">Считается автоматически по классу ' + esc(list[0]) +
+      ' кВ · местность ' + esc(D.pass['МЕСТНОСТЬ']||'не выбрана') + '</div><div class="g">' +
+      cell((nas ? r.gz_nas : r.gz_nen)+' м', 'Габарит провода до земли', 'ПУЭ-7 табл. 2.5.20') +
+      cell(r.g_oksn+' м', 'Габарит ОКСН до земли', 'ПУЭ-7 п. 2.4.89') +
+      cell(String(r.d_oksn_prov).replace('.',',')+' м', 'ОКСН — провод', 'ТТ № 282р п. 3.2.2') +
+      cell('0,20 м', 'ОКСН — элементы опоры', 'ТТ № 282р п. 3.2.3') +
+      cell(r.oz+' м', 'Охранная зона', 'ПП РФ № 160') +
+      '</div>';
+  } else {
+    $('autobox').innerHTML = '<div class="t">Считается автоматически по каждому классу напряжения · местность ' +
+      esc(D.pass['МЕСТНОСТЬ']||'не выбрана') + '</div>' +
+      '<table class="kvtab"><thead><tr><th>Норматив</th>' +
+        list.map(function(k){ return '<th>' + esc(k) + ' кВ</th>'; }).join('') + '</tr></thead><tbody>' +
+      row('Габарит провода до земли, м', function(r){ return dec(nas ? r.gz_nas : r.gz_nen); }) +
+      row('Габарит ОКСН до земли, м', function(r){ return dec(r.g_oksn); }) +
+      row('Расстояние ОКСН — провод, м', function(r){ return dec(r.d_oksn_prov); }) +
+      row('Расстояние ОКСН — элементы опоры, м', function(){ return '0,20'; }) +
+      row('Охранная зона, м', function(r){ return dec(r.oz); }) +
+      row('Опор этого класса в осмотре, шт', function(r, k){ return byKv[k] || 0; }) +
+      '</tbody></table>' +
+      '<div class="mini" style="margin-top:8px">Габариты и расстояния по каждой опоре считаются ' +
+      'по её собственному классу напряжения из карточки.' +
+      (noKv ? ' <b>У ' + noKv + ' опор класс не указан</b> — по ним нормативы берутся по наибольшему классу объекта (' +
+        esc(c.kv) + ' кВ).' : '') +
+      ' Источники: ПУЭ-7 табл. 2.5.20/2.5.22, п. 2.4.89; ТТ № 282р п. 3.2.2, 3.2.3; ПП РФ № 160.</div>';
+  }
+  function dec(v){ return String(v).replace('.', ','); }
+  function row(label, fn){
+    return '<tr><td>' + esc(label) + '</td>' + list.map(function(k){
+      return '<td class="n">' + esc(fn(PPO.vlByKv(k), k)) + '</td>'; }).join('') + '</tr>';
+  }
+  function cell(v,l,s){ return '<div><b>'+v+'</b>'+esc(l)+'<span>'+esc(s)+'</span></div>'; }
+}
+function paintObjLine(){
+  $('objline').textContent = D.pass['ОБЪЕКТ_НАИМ'] || 'объект не задан';
+}
+
+/* ============================================================= 2. ОПОРЫ */
+function paintPoles(){
+  var q = ($('pSearch').value||'').toLowerCase().trim();
+  var list = D.poles.filter(function(p){
+    if (!q) return true;
+    return (String(p.num)+' '+p.line+' '+p.mark+' '+(p.note||'')).toLowerCase().indexOf(q) >= 0;
+  });
+  if (!D.poles.length){
+    $('poleList').innerHTML = '<div class="empty"><b>Опор пока нет</b>' +
+      'Нажмите «Добавить опору», чтобы завести первую карточку, ' +
+      'или «Добавить пачкой», если нумерация идёт подряд.</div>';
+    return;
+  }
+  /* Цепь считаем один раз на всю отрисовку, а не по карточке: иначе список из
+     сотни опор пересчитывал бы её сто раз. */
+  var chain = null;
+  try { chain = PPO.chainSpans(D.poles).byItem; } catch (e) { chain = null; }
+  $('poleList').innerHTML = '<div class="plist">' + list.map(function(p){
+    var x = PPO.poleDerived(p);
+    var tv = x.tv==='есть' ? 'ok' : (x.tv==='отсутствует' ? 'bad' : 'warn');
+    var isBad = !!(p.defect && p.defect !== '—');
+    /* Опора без определённого соседа выпадает из расчёта пролётов —
+       подсвечиваем карточку, чтобы это было видно в списке, а не только
+       после сборки отчёта. */
+    var gap = PPO.poleLinkGap(p, chain ? (chain.get(p) || null) : undefined);
+    var gapTxt = PPO.poleLinkGapText(gap, p.endPole);
+    return '<div class="pcard d-'+esc(p.defect||'—')+(isBad?' bad':'')+(gap?' gap':'')+'" data-id="'+p.id+'"'+
+      (gap?' title="'+esc(gapTxt)+'"':'')+'>' +
+      '<div class="no">Опора № '+esc(p.num||'—')+'</div>' +
+      '<div class="ln">'+esc(p.line||'линия не указана')+'</div>' +
+      '<div class="mk">'+esc(p.mark||'марка не выбрана')+'</div>' +
+      '<div class="mt">'+esc(x.mat||'')+(x.ptype?' · '+esc(x.ptype):'')+'</div>' +
+      '<div class="bot">' +
+        '<span class="tag '+tv+'">'+esc(x.tv)+'</span>' +
+        (isBad ? '<span class="tag bad">дефект '+esc(p.defect)+'</span>' : '') +
+        (p.endPole ? '<span class="tag warn">конец участка</span>'
+                   : (p.span ? '<span class="ico">пролёт '+esc(p.span)+' м</span>' : '')) +
+        (gap ? '<span class="tag gap">'+esc(gapTxt)+'</span>' : '') +
+        (p.hangs ? '<span class="ico">подвесов '+esc(p.hangs)+'</span>' : '') +
+        (p.lat ? '<span class="ico">📍</span>' : '') +
+        ((p.photos&&p.photos.length) ? '<span class="ico ph" data-ph="'+p.id+'" title="Посмотреть фотографии">🖼 '+p.photos.length+'</span>' : '') +
+      '</div></div>';
+  }).join('') + '</div>';
+  Array.prototype.forEach.call($('poleList').querySelectorAll('.pcard'), function(el){
+    el.onclick = function(){ poleEdit(el.dataset.id); };
+  });
+  /* просмотр фотографий прямо из списка, не открывая карточку */
+  Array.prototype.forEach.call($('poleList').querySelectorAll('[data-ph]'), function(el){
+    el.onclick = function(e){ e.stopPropagation(); showPolePhotos(el.dataset.ph); };
+  });
+}
+/* Пересчёт пролётов по координатам.
+   Вызывается кнопкой и автоматически после переноса меток с карты.
+   Введённые вручную значения не трогаются: их правка — сознательное действие
+   осмотрщика, а координаты метки могут быть сняты с погрешностью. */
+function spansRecalc(force){
+  if (!D.poles.length){ toast('Опор ещё нет', true); return; }
+  var r = PPO.recalcSpans({ force: !!force });
+  D = PPO.load(); paintAll();
+  var msg = [];
+  if (r.changed) msg.push('пересчитано пролётов: ' + r.changed);
+  if (r.linked) msg.push('звеньев по ручной привязке: ' + r.linked);
+  if (r.lengthKm) msg.push('протяжённость участка: ' + r.lengthKm + ' км');
+  if (r.ends) msg.push('отмечено концом участка: ' + r.ends + ' (пролёт не считается)');
+  if (r.cleared) msg.push('очищено пролётов: ' + r.cleared);
+  if (r.skippedManual) msg.push('не тронуто введённых вручную: ' + r.skippedManual);
+  if (r.noGeo) msg.push('без координат: ' + r.noGeo);
+  if (r.jumps.length) msg.push('разрывов свыше 600 м: ' + r.jumps.length + ' (пролёт не проставлен)');
+  toast(msg.length ? msg.join(' · ') : 'Расхождений нет: пролёты соответствуют координатам');
+}
+function poleSort(){
+  D.poles.sort(function(a,b){
+    var la = String(a.line||''), lb = String(b.line||'');
+    if (la !== lb) return la < lb ? -1 : 1;
+    /* тот же естественный порядок номеров, что и при пересчёте пролётов:
+       parseFloat давал для «1-11а», «2/3» и «1-12» одно и то же число, и
+       список опор расходился с расчётной цепью */
+    return PPO.cmpPoleNum(a.num, b.num);
+  });
+  commit(); toast('Опоры упорядочены');
+}
+/* ------------------------------------- метки KMZ, не ставшие опорами */
+function paintSkips(){
+  var list = D.skips || [];
+  $('skipCard').style.display = list.length ? '' : 'none';
+  if (!list.length) return;
+  $('skipList').innerHTML = list.map(function(s){
+    var np = (s.photoIds && s.photoIds.length) ? s.photoIds.length : (s.imgs || 0);
+    return '<div class="skiprow">' +
+      '<span class="nm">' + esc(s.raw || '(без подписи)') +
+        (s.why ? '<span class="why">' + esc(s.why) + '</span>' : '') + '</span>' +
+      '<span class="co">' + esc(fixed6(s.lat)) + ', ' + esc(fixed6(s.lon)) + '</span>' +
+      (s.numHint ? '<span class="co">№ ' + esc(s.numHint) + '</span>' : '') +
+      (np ? '<span class="co ph" data-ph="' + s.id + '" title="Посмотреть фотографии метки" ' +
+            'style="cursor:pointer">🖼 ' + esc(np) + '</span>' : '') +
+      '<button class="btn ghost sm" data-mk="' + s.id + '">Сделать опорой</button>' +
+      '<button class="btn ghost sm" data-rm="' + s.id + '">Убрать</button></div>';
+  }).join('');
+  Array.prototype.forEach.call($('skipList').querySelectorAll('[data-ph]'), function(el){
+    el.onclick = function(){ showSkipPhotos(el.dataset.ph); };
+  });
+  Array.prototype.forEach.call($('skipList').querySelectorAll('[data-mk]'), function(b){
+    b.onclick = function(){ skipToPole(b.dataset.mk); };
+  });
+  Array.prototype.forEach.call($('skipList').querySelectorAll('[data-rm]'), function(b){
+    b.onclick = function(){
+      var gone = D.skips.filter(function(x){ return x.id === b.dataset.rm; })[0];
+      /* снимки убранной метки больше ни к чему не привязаны — удаляем,
+         иначе они молча занимали бы место в хранилище браузера */
+      if (gone) (gone.photoIds || []).forEach(function(id){ PPO.photoDel(id); });
+      D.skips = D.skips.filter(function(x){ return x.id !== b.dataset.rm; });
+      commit(); toast('Метка убрана из списка');
+    };
+  });
+}
+function fixed6(v){ var n = parseFloat(v); return isNaN(n) ? '—' : n.toFixed(6); }
+/* Массовое превращение меток в опоры.
+   Номер берётся из подсказки метки, если он свободен; иначе — следующий
+   свободный за наибольшим существующим. Номер не выдумывается «поверх»
+   занятого: две опоры с одним номером в отчёте недопустимы, а какая из них
+   настоящая — решает человек, поэтому подменённые номера перечисляются явно. */
+function skipsAdoptAll(){
+  var list = (D.skips || []).slice();
+  if (!list.length){ toast('Список меток пуст'); return; }
+  var c = PPO.ctx();
+  var defLine = (D.poles[D.poles.length-1] || {}).line || c.object || '';
+
+  var used = {};
+  function key(line, n){
+    return String(line||'').trim().toLowerCase() + '|' + String(n||'').trim().toLowerCase();
+  }
+  D.poles.forEach(function(p){ used[key(p.line, p.num)] = 1; });
+  var maxNum = 0;
+  D.poles.forEach(function(p){
+    var n = parseFloat(String(p.num).replace(',', '.'));
+    if (!isNaN(n) && n > maxNum) maxNum = Math.floor(n);
+  });
+
+  var renamed = [], plan = [];
+  list.forEach(function(sk){
+    var line = sk.lineHint || defLine;
+    var num  = String(sk.numHint || '').trim();
+    if (!num || used[key(line, num)]){
+      var was = num;
+      do { maxNum++; num = String(maxNum); } while (used[key(line, num)]);
+      renamed.push({ was: was || '(без номера)', now: num });
+    }
+    used[key(line, num)] = 1;
+    plan.push({ sk: sk, line: line, num: num });
+  });
+
+  var warn = renamed.length
+    ? '\n\nУ ' + renamed.length + ' меток номер занят или не распознан — им будут присвоены ' +
+      'свободные номера по порядку:\n' +
+      renamed.slice(0, 8).map(function(r){ return '  ' + r.was + ' → № ' + r.now; }).join('\n') +
+      (renamed.length > 8 ? '\n  … и ещё ' + (renamed.length - 8) : '') +
+      '\n\nИсходные подписи сохранятся в примечании карточек — проверьте их.'
+    : '';
+  if (!confirm('Добавить в осмотр ' + list.length + ' меток как опоры?' + warn)) return;
+
+  var made = [];
+  plan.forEach(function(it){
+    var sk = it.sk;
+    var kv = String(sk.kv || '').trim() || c.kv || '';
+    var note = [];
+    if (sk.raw) note.push('подпись метки при обходе: ' + sk.raw);
+    if (sk.why) note.push('перенесена из списка меток: ' + sk.why);
+    if (sk.poleType) note.push('по данным осмотра — ' + sk.poleType);
+    var np = { id: PPO.uid(), line: it.line, num: it.num, kv: kv,
+               mark: (kv && sk.poleType) ? (PPO.markByType(kv, sk.poleType) || '') : '',
+               span: '', spanSrc: '', hangs: 0, mest: '', angle: '', prevOwner: '', prevH: '',
+               defect: sk.defect || '—', defText: '', performer: '', term: '', cost: '',
+               note: note.join('; '),
+               lat: fixed6(sk.lat), lon: fixed6(sk.lon),
+               photos: (sk.photoIds || []).slice() };
+    D.poles.push(np);
+    made.push(np);
+  });
+  D.skips = [];
+  commit();
+  /* снимки лежат в хранилище без привязки — проставляем номер и линию */
+  var jobs = made.filter(function(p){ return p.photos.length; });
+  if (jobs.length){
+    jobs.reduce(function(ch, p){
+      return ch.then(function(){ return PPO.photoRelink(p.photos, p.num, p.line); });
+    }, Promise.resolve()).then(function(){ paintPoles(); });
+  }
+  var ph = made.reduce(function(n, p){ return n + p.photos.length; }, 0);
+  toast('Добавлено опор: ' + made.length +
+        (ph ? ' · перенесено фотографий: ' + ph : '') +
+        (renamed.length ? ' · номеров присвоено заново: ' + renamed.length : ''));
+}
+
+function skipsClear(){
+  if (!confirm('Убрать все метки из списка? На заведённые опоры это не влияет.')) return;
+  (D.skips || []).forEach(function(sk){
+    (sk.photoIds || []).forEach(function(id){ PPO.photoDel(id); });
+  });
+  D.skips = []; commit(); toast('Список очищен');
+}
+/* просмотр фотографий метки до того, как она стала опорой */
+function showSkipPhotos(id){
+  var s = (D.skips||[]).filter(function(x){ return x.id===id; })[0];
+  if (!s) return;
+  var ids = (s.photoIds || []).slice();
+  if (!ids.length){
+    toast('У этой метки фотографии не сохранены: обход переносился версией, ' +
+          'которая их не забирала. Загрузите KMZ заново.', true);
+    return;
+  }
+  Promise.all(ids.map(function(pid){
+    return PPO.photoGet(pid).then(function(r){ return r ? r.blob : null; }).catch(function(){ return null; });
+  })).then(function(bl){
+    var live = bl.filter(Boolean);
+    if (!live.length){ toast('Файлы фотографий не найдены в хранилище браузера', true); return; }
+    openLightbox(live.map(function(b, i){
+      return { url:URL.createObjectURL(b), name:'метка «' + (s.raw||'без подписи') + '» · фото ' + (i+1) };
+    }), 0);
+  });
+}
+function skipToPole(id){
+  var s = (D.skips||[]).filter(function(x){ return x.id===id; })[0];
+  if (!s) return;
+  var last = D.poles[D.poles.length-1] || {}, c = PPO.ctx();
+  D.skips = D.skips.filter(function(x){ return x.id!==id; });
+  /* Снимки метки переходят к опоре вместе с ней. Идентификаторы уже лежат
+     в хранилище с момента импорта KMZ, поэтому переносить нужно не файлы,
+     а привязку: номер и линию проставим после сохранения карточки. */
+  poleForm({
+    id: PPO.uid(), line: last.line || c.object || '', num: '', kv: last.kv || c.kv || '',
+    mark:'', span:'', spanSrc:'', hangs:0, defect:'—', defText:'', performer:'', term:'', cost:'',
+    note: 'подпись метки при обходе: ' + (s.raw||''),
+    lat: fixed6(s.lat), lon: fixed6(s.lon), photos: (s.photoIds || []).slice(),
+    _fromSkip: 1
+  }, true);
+}
+
+/* ============================================================ 3. ДЕФЕКТЫ */
+function paintDefects(){
+  var list = D.poles.filter(function(p){ return p.defect && p.defect !== '—'; });
+  var cnt = { A:0, 'Б':0, 'В':0 };
+  list.forEach(function(p){ if (cnt[p.defect]!==undefined) cnt[p.defect]++; });
+  var noPerf = list.filter(function(p){ return !p.performer; }).length;
+  $('defSum').innerHTML =
+    '<div><b>' + list.length + '</b>дефектов всего</div>' +
+    '<div><b>' + cnt.A + '</b>категория A — аварийное</div>' +
+    '<div><b>' + cnt['Б'] + '</b>категория Б — ограниченно</div>' +
+    '<div><b>' + noPerf + '</b>без исполнителя</div>';
+  if (!list.length){
+    $('defList').innerHTML = '<div class="empty"><b>Дефектов нет</b>' +
+      'Категория дефекта ставится в карточке опоры или кнопкой выше. ' +
+      'Пока дефектов нет, приложение В отчёта останется пустым.</div>';
+    return;
+  }
+  $('defList').innerHTML = list.map(function(p){
+    var x = PPO.poleDerived(p);
+    return '<div class="dcard" data-id="' + p.id + '">' +
+      '<div class="dh"><b>Опора № ' + esc(p.num||'—') + '</b>' +
+        '<span class="tag bad">категория ' + esc(p.defect) + '</span>' +
+        '<span class="ln">' + esc(p.line||'линия не указана') + '</span></div>' +
+      '<div class="dtxt">' + esc(x.defTxt || 'описание не задано') + '</div>' +
+      '<div class="bot" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' +
+        '<span class="tag ' + (p.performer ? 'neutral' : 'warn') + '">' +
+          esc(p.performer || 'исполнитель не назначен') + '</span>' +
+        (p.term ? '<span class="tag neutral">срок ' + esc(PPO.fmtDate(p.term)) + '</span>' : '') +
+        (p.cost ? '<span class="tag neutral">' + esc(p.cost) + ' руб.</span>' : '') +
+        '<button class="btn ghost sm" data-ed="' + p.id + '" style="margin-left:auto">Заполнить</button>' +
+      '</div></div>';
+  }).join('');
+  Array.prototype.forEach.call($('defList').querySelectorAll('[data-ed]'), function(b){
+    b.onclick = function(){ defEdit(b.dataset.ed); };
+  });
+}
+function defAdd(){
+  var free = D.poles.filter(function(p){ return !p.defect || p.defect === '—'; });
+  if (!D.poles.length){ toast('Сначала внесите опоры', true); return; }
+  if (!free.length){ toast('На всех опорах дефекты уже отмечены', true); return; }
+  mOpen('Отметить дефект на опоре',
+    '<div class="field"><label>Опора</label><select id="d_pole">' +
+      free.map(function(p){
+        return '<option value="' + p.id + '">№ ' + esc(p.num||'—') + ' · ' + esc(p.line||'без линии') + '</option>';
+      }).join('') + '</select></div>' +
+    '<div class="field"><label>Категория дефекта</label><select id="d_cat">' +
+      PPO.DEFECTS.filter(function(x){ return x.cat !== '—'; }).map(function(x){
+        return '<option value="' + esc(x.cat) + '">категория ' + esc(x.cat) + ' — ' + esc(x.state.toLowerCase()) + '</option>';
+      }).join('') + '</select></div>',
+    '<button class="btn ghost" onclick="mClose()">Отмена</button>' +
+    '<button class="btn" id="d_ok">Отметить</button>');
+  $('d_ok').onclick = function(){
+    var p = D.poles.filter(function(x){ return x.id === $('d_pole').value; })[0];
+    if (!p) return;
+    p.defect = $('d_cat').value;
+    mClose(); commit(); go('def'); defEdit(p.id);
+  };
+}
+function defEdit(id){
+  var p = D.poles.filter(function(x){ return x.id === id; })[0];
+  if (!p) return;
+  var x = PPO.poleDerived(p);
+  var perfOpts = PPO.LISTS.performer.map(function(o){
+    return '<option' + (o === p.performer ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('');
+  var catOpts = PPO.DEFECTS.map(function(dd){
+    return '<option value="' + esc(dd.cat) + '"' + (dd.cat === p.defect ? ' selected' : '') + '>' +
+      (dd.cat === '—' ? 'без дефектов' : 'категория ' + dd.cat) + '</option>'; }).join('');
+  mOpen('Дефект опоры № ' + (p.num || ''),
+    '<div class="grid2">' +
+      fld('Категория дефекта', '<select id="e_cat">' + catOpts + '</select>') +
+      fld('Исполнитель мероприятия',
+          '<select id="e_perf"><option value="">— не назначен —</option>' + perfOpts + '</select>',
+          'Пункт 26 Правил: распределение обязанностей определяется договором.') +
+    '</div>' +
+    fld('Описание (как зафиксировано при осмотре)',
+        '<textarea id="e_txt" placeholder="например: отклонение стойки от оси">' + esc(p.defText || '') + '</textarea>',
+        'Пусто — при выбранной категории в отчёт пойдёт типовая формулировка. ' +
+        'Если категория «без дефектов», описание остаётся наблюдением исполнителя: ' +
+        'опора дефектной не считается, а описание уходит в примечание к опоре.') +
+    '<div class="grid2">' +
+      fld('Срок выполнения', '<input type="date" id="e_term" value="' + esc(p.term || '') + '">') +
+      fld('Ориентировочная стоимость, руб. с НДС',
+          '<input type="text" id="e_cost" value="' + esc(p.cost || '') + '" placeholder="например: 48 500">') +
+    '</div>' +
+    fld('Примечание к опоре', '<textarea id="e_note">' + esc(p.note || '') + '</textarea>',
+        'Попадает в графу «Примечание» приложения В отчёта.') +
+    '<div class="note" id="e_hint"></div>',
+    '<button class="btn ghost" onclick="mClose()">Отмена</button>' +
+    '<button class="btn" id="e_ok">Сохранить</button>');
+  function hint(){
+    var dd = PPO.defectByCat($('e_cat').value);
+    $('e_hint').innerHTML = '<b>' + esc(dd.state) + '</b>технологическая возможность: ' + esc(dd.tv) +
+      (dd.act ? '<br>Мероприятие: ' + esc(dd.act) : '') +
+      (dd.txt ? '<br>Типовая формулировка: ' + esc(dd.txt) : '');
+  }
+  $('e_cat').onchange = hint; hint();
+  $('e_ok').onclick = function(){
+    var cat = PPO.normCat($('e_cat').value);
+    var txt = $('e_txt').value.trim();
+    /* Описание без категории допускается: это наблюдение исполнителя, а не
+       дефект. Опора остаётся бездефектной, а описание уходит в примечание. */
+    p.defect = cat;
+    p.defText = txt;
+    if (cat === '\u2014'){ p.performer = ''; p.term = ''; p.cost = ''; }
+    if (cat !== '\u2014'){
+      p.performer = $('e_perf').value;
+      p.term = $('e_term').value;
+      p.cost = $('e_cost').value.trim();
+    }
+    p.note = $('e_note').value.trim();
+    mClose(); commit(); toast('Сохранено');
+  };
+}
+
+function poleNew(){
+  var last = D.poles[D.poles.length-1] || {};
+  var c = PPO.ctx();
+  poleForm({
+    id: PPO.uid(), line: last.line || c.object || '', num: last.num ? nextNum(last.num) : '',
+    kv: last.kv || c.kv || '', mark: last.mark || '', span: '', hangs: last.hangs || 0,
+    defect: '—', defText:'', performer:'', term:'', cost:'', note: '', lat:'', lon:'', photos: []
+  }, true);
+}
+function nextNum(n){ var m = String(n).match(/^(.*?)(\d+)$/); return m ? m[1] + (parseInt(m[2],10)+1) : ''; }
+function poleEdit(id){
+  var p = D.poles.filter(function(x){ return x.id===id; })[0];
+  if (p) poleForm(p, false);
+}
+/* Смежные опоры и расчётный пролёт — показываем прямо в карточке.
+   Пролёт вводится один (до следующей опоры), а нагрузку определяет
+   ветровой пролёт — полусумма смежных. Чтобы осмотрщик видел, что
+   получится, и не пытался вводить второй пролёт руками. */
+function spanInfoHtml(p){
+  try{
+    var rec = PPO.chainSpans(PPO.load().poles).byItem.get(
+      PPO.load().poles.filter(function(x){ return x.id === p.id; })[0]);
+    if (!rec) return '';
+    var parts = [];
+    if (rec.prevNum) parts.push('предыдущая — оп. ' + esc(rec.prevNum) +
+      (rec.lPrev !== null ? ' (' + rec.lPrev + ' м)' : ' (пролёт не задан)'));
+    if (rec.nextNum) parts.push('следующая — оп. ' + esc(rec.nextNum) +
+      (rec.lNext !== null ? ' (' + rec.lNext + ' м)' : ' (пролёт не задан)'));
+    if (rec.endPole)
+      return '<div class="note" style="margin-top:6px">Опора отмечена как <b>конечная (концевая)</b>: ' +
+             'пролёт до следующей опоры не рассчитывается, участок на ней заканчивается.' +
+             (rec.lPrev !== null ? '<br>Смежный пролёт до предыдущей опоры — ' + rec.lPrev + ' м' +
+               (rec.lw !== null ? '; расчётный (ветровой) пролёт — <b>' + rec.lw + ' м</b> (половина единственного смежного).' : '.') : '') +
+             '</div>';
+    if (!parts.length) return '<div class="note" style="margin-top:6px">Смежных опор в линии не найдено.</div>';
+    var kind = rec.spur ? 'опора ответвления' : (rec.ends ? 'концевая опора цепи' : 'промежуточная опора');
+    return '<div class="note" style="margin-top:6px">' + kind + ': ' + parts.join('; ') +
+      (rec.lw !== null ? '.<br>Расчётный (ветровой) пролёт — <b>' + rec.lw + ' м</b>' +
+        (rec.ends ? ' (половина единственного смежного)' : ' (полусумма смежных)') + '.' : '.') +
+      '</div>';
+  }catch(e){ return ''; }
+}
+/* Выбор соседней опоры вручную. В списке — все опоры объекта, включая другие
+   линии и классы напряжения: именно там обычно и лежит продолжение, которое
+   геометрический ход по своей линии найти не может. */
+function neighbourSelect(elId, p, which){
+  var cur = String(p[which + 'Id'] || '');
+  /* сосед, найденный по координатам, — из той же цепи, что и расчёт пролётов */
+  var autoNum = '';
+  try {
+    var src = PPO.load().poles.filter(function(x){ return x.id === p.id; })[0];
+    var rec = src ? PPO.chainSpans(PPO.load().poles).byItem.get(src) : null;
+    if (rec) autoNum = String((which === 'next' ? rec.nextNum : rec.prevNum) || '');
+  } catch (e) { autoNum = ''; }
+  var autoTxt = '— по координатам' + (autoNum ? ': № ' + autoNum : ' (в этой линии не найдена)') + ' —';
+  var opts = '<option value="">' + esc(autoTxt) + '</option>';
+  D.poles.forEach(function(x){
+    if (x.id === p.id) return;
+    var lbl = '№ ' + (x.num || '?') + ' · ' + (x.line || 'без линии') +
+              (x.kv ? ' · ' + x.kv + ' кВ' : '') +
+              (parseFloat(x.lat) ? '' : ' · без координат');
+    opts += '<option value="' + esc(x.id) + '"' + (x.id === cur ? ' selected' : '') + '>' + esc(lbl) + '</option>';
+  });
+  return '<select id="' + elId + '">' + opts + '</select>';
+}
+
+function poleForm(p, isNew){
+  var c = PPO.ctx();
+  var kvOpts = PPO.LISTS.kv.map(function(k){ return '<option'+(k===p.kv?' selected':'')+'>'+k+'</option>'; }).join('');
+  mOpen((isNew?'Новая опора':'Опора № '+(p.num||'')),
+    '<div class="grid2">' +
+      fld('Линия / фидер','<input type="text" id="f_line" value="'+esc(p.line)+'" placeholder="ВЛ 10 кВ КН-13">') +
+      fld('№ опоры <span class="req">•</span>','<input type="text" id="f_num" value="'+esc(p.num)+'" placeholder="13">') +
+      fld('Класс напряжения, кВ','<select id="f_kv"><option value=""></option>'+kvOpts+'</select>') +
+      fld('Марка опоры','<select id="f_mark"></select>','Список отфильтрован по классу. Если марки нет — оставьте пустым и опишите в примечании.') +
+      fld('Пролёт до следующей опоры, м',
+        '<input type="number" id="f_span" value="'+esc(p.span)+'" readonly>' + spanInfoHtml(p),
+        'Пролёт не вводится: он определяется по координатам опор. Порядок опор в линии тоже строится по координатам, ' +
+        'а не по номеру — поэтому одинаковые номера у разных опор расчёту не мешают.') +
+      fld('Предыдущая опора', neighbourSelect('f_prev', p, 'prev'),
+        'Оставьте «по координатам», пока опора идёт по своей линии. Указывайте вручную, если предыдущая опора ' +
+        'лежит на другой линии или в другом классе напряжения — в ход по линии она не попадает.') +
+      fld('Следующая опора', neighbourSelect('f_next', p, 'next'),
+        'То же самое для продолжения линии. Пролёт всё равно считается по координатам обеих опор — ' +
+        'вручную задаётся только сама пара.') +
+      fld('Конец участка','<label class="chk"><input type="checkbox" id="f_end"'+(p.endPole?' checked':'')+
+        '> Конечная (концевая) опора — пролёт до следующей не считать</label>',
+        'Ставьте признак там, где линия обрывается: концевая опора, конец обследуемого участка, переход в КЛ. ' +
+        'Пролёт до следующей опоры у такой опоры не рассчитывается ни по координатам, ни вручную, ' +
+        'а следующая по номеру опора начинает новый участок.') +
+      fld('Существующих подвесов связи, шт','<input type="number" id="f_hangs" step="1" min="0" value="'+esc(p.hangs===undefined?0:p.hangs)+'">') +
+      fld('Характер местности','<select id="f_mest"><option value="">— как у объекта —</option>' +
+        PPO.LISTS.mest.map(function(m){ return '<option'+(m===(p.mest||'')?' selected':'')+'>'+m+'</option>'; }).join('') +
+        '</select>','От этого зависит нормируемый габарит провода до земли: для 10 кВ 7,0 м в населённой и 6,0 м в ненаселённой.') +
+      fld('Угол поворота, град','<input type="number" id="f_angle" step="1" min="0" max="90" value="'+esc(p.angle||'')+'">','Только для угловых опор. Без угла доля тяжения принимается 1,0 — в запас.') +
+      fld('Ранее размещённые ОК — владелец','<input type="text" id="f_pown" value="'+esc(p.prevOwner||'')+'" placeholder="ООО «Оператор»">') +
+      fld('Ранее размещённые ОК — высота подвеса, м','<input type="number" id="f_ph2" step="0.1" value="'+esc(p.prevH||'')+'">') +
+    '</div>' +
+    '<div class="field"><label>Категория дефекта</label><div class="chips" id="f_def">' +
+      PPO.DEFECTS.map(function(d){
+        return '<span class="chip'+(PPO.normCat(d.cat)===PPO.normCat(p.defect)?' on':'')+'" data-c="'+esc(d.cat)+'">'+
+               (d.cat==='—'?'без дефектов':'категория '+d.cat)+'</span>'; }).join('') +
+      '</div><div class="hint" id="f_defhint"></div></div>' +
+    '<div class="grid2">' +
+      fld('Широта','<input type="text" id="f_lat" value="'+esc(p.lat)+'" placeholder="45.104200">') +
+      fld('Долгота','<input type="text" id="f_lon" value="'+esc(p.lon)+'" placeholder="41.028100">') +
+    '</div>' +
+    '<div class="btnrow" style="margin:-4px 0 14px"><button class="btn ghost sm" id="f_gps">Взять координаты с устройства</button>' +
+      '<span class="mini" id="f_gpsmsg"></span></div>' +
+    fld('Примечание','<textarea id="f_note">'+esc(p.note||'')+'</textarea>') +
+    '<div class="field"><label>Фотографии</label>' +
+      '<button class="btn ghost sm" id="f_ph">+ Добавить фото</button>' +
+      '<input type="file" id="f_phin" accept="image/*" multiple hidden>' +
+      '<div class="photos" id="f_phlist"></div></div>',
+    [ isNew ? '' : '<button class="btn danger" id="f_del">Удалить опору</button>',
+      '<button class="btn ghost" onclick="mClose()">Отмена</button>',
+      '<button class="btn" id="f_ok">'+(isNew?'Добавить':'Сохранить')+'</button>' ].join('')
+  );
+
+  function fillMarks(){
+    var kv = $('f_kv').value;
+    var arr = kv ? PPO.polesByKv(kv) : PPO.POLES;
+    $('f_mark').innerHTML = '<option value="">— не выбрана —</option>' + arr.map(function(o){
+      return '<option'+(o.mark===p.mark?' selected':'')+'>'+esc(o.mark)+'</option>'; }).join('');
+    markInfo();
+  }
+  function markInfo(){
+    var r = PPO.poleByMark($('f_mark').value);
+    var h = $('f_mark').closest('.field').querySelector('.hint');
+    h.innerHTML = r ? (esc(r.mat)+' · '+esc(r.type)+'<br>'+esc(r.proj)+', стойка '+esc(r.st)+
+      '<br>допустимый момент стойки '+r.m_adm+' кН·м · высота подвеса '+r.h+' м · габаритный пролёт '+r.lgab+' м' +
+      (PPO.poleTensioned(r.sch) ? '<br><b>Воспринимает тяжение ('+esc(r.sch)+')</b>: количественный запас по такой опоре не выдаётся, поверочный расчёт уходит в проектную документацию.' : '') +
+      (r.approx ? '<br><b style="color:var(--warn)">Несущая способность принята по стойке-аналогу</b>, а не из типового проекта: перед выпуском отчёта подтвердите допустимый момент, высоту подвеса и габаритный пролёт по проекту ' + esc(r.proj) + '.' : '') +
+      (r.user ? '<br><span class="mini">Запись добавлена вручную в разделе «Справочники».</span>' : ''))
+      : 'Список отфильтрован по классу. Если марки нет — оставьте пустым и опишите в примечании.';
+  }
+  function defHint(){
+    var cat = $('f_def').querySelector('.chip.on');
+    var d = PPO.defectByCat(cat ? cat.dataset.c : '—');
+    $('f_defhint').innerHTML = '<b>'+esc(d.state)+'</b> · технологическая возможность: '+esc(d.tv) +
+      (d.txt ? '<br>'+esc(d.txt) : '') + (d.act ? '<br>Мероприятие: '+esc(d.act) : '');
+  }
+  function endSync(){
+    var on = $('f_end').checked;
+    $('f_span').closest('.field').style.opacity = on ? '.55' : '';
+    if (on) $('f_span').value = '';
+  }
+  $('f_end').onchange = endSync;
+  /* Признак конца участка ставится ТОЛЬКО вручную и по марке не выводится:
+     концевая по конструкции опора сплошь и рядом стоит в середине хода —
+     там, где линия продолжается на другой фидер или в другой класс
+     напряжения. Такую опору нужно связать со следующей полями выше, а не
+     обрывать на ней расчёт. */
+  $('f_kv').onchange = fillMarks;
+  $('f_mark').onchange = markInfo;
+  fillMarks(); defHint(); endSync();
+  Array.prototype.forEach.call($('f_def').querySelectorAll('.chip'), function(el){
+    el.onclick = function(){
+      Array.prototype.forEach.call($('f_def').querySelectorAll('.chip'), function(x){ x.classList.remove('on'); });
+      el.classList.add('on'); defHint();
+    };
+  });
+  $('f_gps').onclick = function(e){
+    e.preventDefault();
+    if (!navigator.geolocation) { $('f_gpsmsg').textContent = 'Устройство не отдаёт координаты'; return; }
+    $('f_gpsmsg').textContent = 'определяю…';
+    navigator.geolocation.getCurrentPosition(function(pos){
+      $('f_lat').value = pos.coords.latitude.toFixed(6);
+      $('f_lon').value = pos.coords.longitude.toFixed(6);
+      $('f_gpsmsg').textContent = 'точность ±' + Math.round(pos.coords.accuracy) + ' м';
+    }, function(){ $('f_gpsmsg').textContent = 'не удалось — включите геолокацию для сайта'; },
+       { enableHighAccuracy:true, timeout:12000 });
+  };
+
+  var photos = (p.photos||[]).slice();
+  function paintPh(){
+    $('f_phlist').innerHTML = '';
+    /* грузим все разом и держим общий список — иначе просмотр листался бы
+       не по всем фотографиям опоры, а по одной */
+    Promise.all(photos.map(function(pid){
+      return PPO.photoGet(pid).then(function(rec){ return rec ? { pid:pid, rec:rec } : null; })
+                              .catch(function(){ return null; });
+    })).then(function(list){
+      var live = list.filter(Boolean);
+      var gallery = live.map(function(o, i){
+        return { url: URL.createObjectURL(o.rec.blob),
+                 name: 'опора № ' + (p.num || '?') + (p.line ? ' · ' + p.line : '') +
+                       ' · фото ' + (i+1) };
+      });
+      $('f_phlist').innerHTML = '';
+      if (!live.length && photos.length){
+        /* идентификаторы у опоры есть, а файлов в хранилище нет —
+           раньше это выглядело как «миниатюра не открывается» */
+        $('f_phlist').innerHTML = '<div class="phwarn">Файлы ' + photos.length + ' ' +
+          (photos.length===1?'фотографии':'фотографий') +
+          ' не найдены в хранилище браузера. Возможные причины: снимки делались в другом браузере, ' +
+          'приватный режим или очистка данных сайта. Добавьте фотографии заново.</div>';
+        return;
+      }
+      live.forEach(function(o, i){
+        var f = document.createElement('figure');
+        f.tabIndex = 0;
+        f.title = 'Открыть фотографию';
+        var im = document.createElement('img');
+        im.src = gallery[i].url;
+        im.alt = gallery[i].name;
+        /* клик ловим на всей плитке: попадание по 74-пиксельной картинке
+           на телефоне промахивается мимо <img> из-за object-fit */
+        f.onclick = function(e){
+          if (e.target.tagName === 'BUTTON') return;
+          openLightbox(gallery, i);
+        };
+        f.onkeydown = function(e){
+          if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openLightbox(gallery, i); }
+        };
+        var bt = document.createElement('button'); bt.type = 'button';
+        bt.textContent = '✕'; bt.title = 'Удалить фотографию';
+        bt.onclick = function(e){
+          e.stopPropagation(); e.preventDefault();
+          photos = photos.filter(function(x){ return x !== o.pid; });
+          PPO.photoDel(o.pid); paintPh();
+        };
+        f.appendChild(im); f.appendChild(bt); $('f_phlist').appendChild(f);
+      });
+    }).catch(function(err){
+      $('f_phlist').innerHTML = '<div class="phwarn">Не удалось прочитать фотографии: ' +
+        esc(err && err.message ? err.message : 'хранилище недоступно') + '</div>';
+    });
+  }
+  paintPh();
+  $('f_ph').onclick = function(e){ e.preventDefault(); $('f_phin').click(); };
+  $('f_phin').onchange = function(e){
+    var files = Array.prototype.slice.call(e.target.files);
+    Promise.all(files.map(function(f){
+      return PPO.photoShrink(f).then(function(b){
+        var id = PPO.uid();
+        return PPO.photoPut({ id:id, blob:b, pole:p.num, at:new Date().toISOString() }).then(function(){ photos.push(id); });
+      });
+    })).then(paintPh);
+    e.target.value = '';
+  };
+
+  if ($('f_del')) $('f_del').onclick = function(){
+    if (!confirm('Удалить опору № '+(p.num||'')+'?')) return;
+    D.poles = D.poles.filter(function(x){ return x.id !== p.id; });
+    mClose(); commit(); toast('Опора удалена');
+  };
+  $('f_ok').onclick = function(){
+    p.line = $('f_line').value.trim();
+    p.num  = $('f_num').value.trim();
+    p.kv   = $('f_kv').value;
+    p.mark = $('f_mark').value;
+    /* Правка пролёта вручную защищает его от пересчёта по координатам:
+       замер рулеткой в поле точнее расстояния между метками. */
+    /* Пролёт из формы не читается: он производный от координат. Ручной ввод
+       на разобранном объекте завышал пролёты на 28 % и до 43 м на отдельной
+       опоре, а на них строится расчётный пролёт приложения Ж. */
+    /* Признак конечной опоры сильнее любого пролёта: линия на ней обрывается,
+       расстояние до следующей по номеру метки пролётом не является. */
+    p.endPole = $('f_end').checked ? 1 : 0;
+    if (p.endPole){ p.span = ''; p.spanSrc = ''; }
+    /* Ручная привязка соседей: хранится идентификатором опоры — номера
+       повторяются, и однозначен только идентификатор. Текстовую ссылку
+       «линия|номер» для книги ядро пересобирает само. */
+    p.prevId = $('f_prev') ? $('f_prev').value : '';
+    p.nextId = $('f_next') ? $('f_next').value : '';
+    if (!p.prevId) p.prevRef = '';
+    if (!p.nextId) p.nextRef = '';
+    p.hangs= $('f_hangs').value;
+    p.mest = $('f_mest').value;
+    p.angle = $('f_angle').value;
+    p.prevOwner = $('f_pown').value.trim();
+    p.prevH = $('f_ph2').value;
+    /* Категория снимается, описание сохраняется: описание — это наблюдение
+       исполнителя, оно ценно само по себе и уходит в примечание опоры.
+       Дефектной опору делает только категория. */
+    p.defect = PPO.normCat(($('f_def').querySelector('.chip.on')||{dataset:{c:'—'}}).dataset.c);
+    if (p.defect === '\u2014'){ p.performer = ''; p.term = ''; p.cost = ''; }
+    p.lat = $('f_lat').value.trim();
+    p.lon = $('f_lon').value.trim();
+    p.note = $('f_note').value.trim();
+    p.photos = photos;
+    if (!p.num){ toast('Укажите номер опоры', true); return; }
+    if (isNew) D.poles.push(p);
+    var fromSkip = p._fromSkip; delete p._fromSkip;
+    mClose(); commit();
+    /* Координаты могли измениться, а пролёты от них производные — пересчёт
+       сразу, чтобы форма и отчёт не расходились до ручного нажатия кнопки. */
+    PPO.recalcSpans({ force:true }); D = PPO.load(); paintAll();
+    /* снимки, пришедшие с метки KMZ, лежат в хранилище без номера опоры:
+       без перепривязки они не попали бы в фотоприложение отчёта */
+    if (fromSkip && p.photos.length)
+      PPO.photoRelink(p.photos, p.num, p.line).then(function(){ paintPoles(); });
+    toast(isNew ? (fromSkip && p.photos.length
+        ? 'Опора добавлена, перенесено фотографий: ' + p.photos.length
+        : 'Опора добавлена') : 'Сохранено');
+  };
+}
+
+/* добавление пачкой */
+function batchOpen(){
+  var last = D.poles[D.poles.length-1] || {}, c = PPO.ctx();
+  mOpen('Добавить опоры пачкой',
+    '<p class="mini" style="margin-top:0">Создаст карточки с последовательными номерами. Марку, дефекты ' +
+    'и измерения можно потом уточнить в каждой карточке отдельно.</p>' +
+    '<div class="grid2">' +
+      fld('Линия / фидер','<input type="text" id="b_line" value="'+esc(last.line||'')+'">') +
+      fld('Класс напряжения, кВ','<select id="b_kv"><option value=""></option>'+
+        PPO.LISTS.kv.map(function(k){ return '<option'+(k===(last.kv||c.kv)?' selected':'')+'>'+k+'</option>'; }).join('')+'</select>') +
+      fld('Номер первой опоры','<input type="number" id="b_from" value="1">') +
+      fld('Номер последней опоры','<input type="number" id="b_to" value="10">') +
+      fld('Марка по умолчанию','<select id="b_mark"></select>') +
+      fld('Типовой пролёт, м','<input type="number" id="b_span" value="50">') +
+    '</div>',
+    '<button class="btn ghost" onclick="mClose()">Отмена</button><button class="btn" id="b_ok">Создать</button>');
+  function fill(){
+    var arr = $('b_kv').value ? PPO.polesByKv($('b_kv').value) : PPO.POLES;
+    $('b_mark').innerHTML = '<option value="">— не выбрана —</option>' +
+      arr.map(function(o){ return '<option'+(o.mark===last.mark?' selected':'')+'>'+esc(o.mark)+'</option>'; }).join('');
+  }
+  $('b_kv').onchange = fill; fill();
+  $('b_ok').onclick = function(){
+    var a = parseInt($('b_from').value,10), b = parseInt($('b_to').value,10);
+    if (isNaN(a)||isNaN(b)||b<a){ toast('Проверьте диапазон номеров', true); return; }
+    if (b-a > 500){ toast('Слишком много — не больше 500 за раз', true); return; }
+    for (var i=a;i<=b;i++){
+      D.poles.push({ id:PPO.uid(), line:$('b_line').value.trim(), num:String(i), kv:$('b_kv').value,
+        mark:$('b_mark').value, span:$('b_span').value, hangs:0, defect:'—', note:'', lat:'', lon:'', photos:[] });
+    }
+    mClose(); commit(); toast('Создано опор: ' + (b-a+1));
+  };
+}
+
+/* ====================================================== 3a. МЕРОПРИЯТИЯ
+   Позиции не хранятся, а выводятся из дефектов и измерений (PPO.buildActs).
+   Здесь хранятся и правятся только назначения: исполнитель, срок, стоимость,
+   снятие позиции и добавленные вручную строки.                            */
+function actOver(key){
+  var a = (D.acts||[]).filter(function(x){ return x.key === key; })[0];
+  if (!a){ a = { key:key, performer:'', term:'', cost:'', actText:'', off:0, manual:0 };
+           D.acts = D.acts || []; D.acts.push(a); }
+  return a;
+}
+function paintActs(){
+  var list;
+  try { list = PPO.buildActs(); } catch(e){ list = []; }
+  var e1 = list.filter(function(a){ return String(a.grp).indexOf('\u0415.1') === 0; });
+  var e2 = list.filter(function(a){ return String(a.grp).indexOf('\u0415.2') === 0; });
+  var noPerf = list.filter(function(a){ return !String(a.performer||'').trim(); }).length;
+  var off = (D.acts||[]).filter(function(a){ return a.off; }).length;
+  $('actSum').innerHTML =
+    '<div><b>' + list.length + '</b>мероприятий всего</div>' +
+    '<div><b>' + e1.length + '</b>Е.1 — обусловлено размещением</div>' +
+    '<div><b>' + e2.length + '</b>Е.2 — состояние объекта</div>' +
+    '<div><b>' + noPerf + '</b>без исполнителя</div>' +
+    (off ? '<div><b>' + off + '</b>снято вручную</div>' : '');
+
+  if (!list.length){
+    $('actList').innerHTML = '<div class="empty"><b>Мероприятий нет</b>' +
+      'Позиции появятся сами, как только будут отмечены дефекты опор или записаны измерения ' +
+      'с отрицательным выводом. Приложение Е отчёта останется пустым.</div>';
+    return;
+  }
+  function block(title, arr){
+    if (!arr.length) return '';
+    return '<div class="card"><h2>' + esc(title) + '</h2>' + arr.map(function(a){
+      return '<div class="dcard" style="border-left-color:' +
+        (String(a.grp).indexOf('\u0415.1') === 0 ? 'var(--blue)' : 'var(--bad)') + '">' +
+        '<div class="dh"><b>' + esc(a.act) + '</b></div>' +
+        '<div class="dtxt">' + esc(a.base || 'основание не указано') + '</div>' +
+        '<div class="bot" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">' +
+          (a.line ? '<span class="tag neutral">' + esc(a.line) + '</span>' : '') +
+          (a.num ? '<span class="tag neutral">опора № ' + esc(a.num) + '</span>' : '') +
+          '<span class="tag ' + (a.performer ? 'neutral' : 'warn') + '">' +
+            esc(a.performer || 'исполнитель не назначен') + '</span>' +
+          (a.term ? '<span class="tag neutral">срок ' + esc(PPO.fmtDate(a.term)) + '</span>' : '') +
+          (a.cost ? '<span class="tag neutral">' + esc(a.cost) + ' руб.</span>' : '') +
+          (a.manual ? '<span class="tag warn">добавлено вручную</span>' : '') +
+          (a.edited ? '<span class="tag ok">правка сохранена</span>' : '') +
+          '<button class="btn ghost sm" data-ea="' + esc(a.key) + '" style="margin-left:auto">Заполнить</button>' +
+        '</div></div>'; }).join('') + '</div>';
+  }
+  $('actList').innerHTML = block('Е.1 — обусловлено размещением сети электросвязи', e1) +
+                           block('Е.2 — состояние объекта инфраструктуры', e2);
+  Array.prototype.forEach.call($('actList').querySelectorAll('[data-ea]'), function(b){
+    b.onclick = function(){ actEdit(b.dataset.ea); };
+  });
+}
+function actEdit(key){
+  var a = PPO.buildActs().filter(function(x){ return x.key === key; })[0];
+  if (!a) return;
+  var perfOpts = PPO.LISTS.performer.map(function(o){
+    return '<option' + (o === a.performer ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('');
+  mOpen('Мероприятие',
+    '<div class="note" style="margin-top:0"><b>' + esc(a.grp) + '</b>' +
+      esc(a.line ? a.line + ', ' : '') + esc(a.num ? 'опора № ' + a.num : '') + '</div>' +
+    fld('Мероприятие', '<textarea id="a_txt">' + esc(a.act) + '</textarea>',
+        a.manual ? '' : 'Без изменений — останется типовая формулировка.') +
+    fld('Основание', '<div class="hint" style="margin:0">' + esc(a.base || '—') + '</div>') +
+    '<div class="grid2">' +
+      fld('Исполнитель',
+          '<select id="a_perf"><option value="">— не назначен —</option>' + perfOpts + '</select>',
+          'Пункт 26 Правил: распределение обязанностей определяется договором. Группу Е.1/Е.2 выбор исполнителя не меняет.') +
+      fld('Срок выполнения', '<input type="date" id="a_term" value="' + esc(a.term || '') + '">') +
+    '</div>' +
+    fld('Ориентировочная стоимость, руб. с НДС',
+        '<input type="text" id="a_cost" value="' + esc(a.cost || '') + '" placeholder="например: 48 500">'),
+    [ '<button class="btn danger" id="a_off">' + (a.manual ? 'Удалить' : 'Снять позицию') + '</button>',
+      '<button class="btn ghost" onclick="mClose()">Отмена</button>',
+      '<button class="btn" id="a_ok">Сохранить</button>' ].join(''));
+
+  $('a_off').onclick = function(){
+    if (!confirm(a.manual ? 'Удалить добавленную вручную позицию?'
+      : 'Снять позицию из приложения Е? Она перестанет выводиться, пока дефект или измерение, ' +
+        'из которых она следует, не изменятся.')) return;
+    if (a.manual) D.acts = (D.acts||[]).filter(function(x){ return x.key !== key; });
+    else actOver(key).off = 1;
+    mClose(); commit(); toast(a.manual ? 'Позиция удалена' : 'Позиция снята');
+  };
+  $('a_ok').onclick = function(){
+    var o = actOver(key);
+    o.performer = $('a_perf').value;
+    o.term = $('a_term').value;
+    o.cost = $('a_cost').value.trim();
+    var txt = $('a_txt').value.trim();
+    o.actText = (txt && txt !== a.act) ? txt : (a.manual ? txt : '');
+    o.off = 0;
+    if (a.manual){ o.manual = 1; o.grp = a.grp; o.line = a.line; o.num = a.num; o.base = a.base; }
+    /* Исполнитель, назначенный по дефекту опоры, дублируем в карточку опоры:
+       вкладка «Дефекты» и приложение Е должны показывать одно и то же. */
+    if (!a.manual && a.num){
+      D.poles.forEach(function(pp){
+        if (String(pp.num) !== String(a.num)) return;
+        if (a.line && String(pp.line||'') !== String(a.line)) return;
+        if (!pp.defect || pp.defect === '\u2014') return;
+        pp.performer = o.performer; pp.term = o.term; pp.cost = o.cost;
+      });
+    }
+    mClose(); commit(); toast('Сохранено');
+  };
+}
+function actNew(){
+  var grpOpts = PPO.LISTS.actGrp.map(function(g){ return '<option>' + esc(g) + '</option>'; }).join('');
+  var perfOpts = PPO.LISTS.performer.map(function(o){ return '<option>' + esc(o) + '</option>'; }).join('');
+  mOpen('Новое мероприятие',
+    fld('Группа <span class="req">•</span>', '<select id="n_grp">' + grpOpts + '</select>',
+        'Е.1 — вызвано размещением сети; Е.2 — состояние объекта.') +
+    '<div class="grid2">' +
+      fld('Линия / фидер', '<input type="text" id="n_line" placeholder="ВЛ 10 кВ КН-13">') +
+      fld('№ опоры', '<input type="text" id="n_num" placeholder="13">') +
+    '</div>' +
+    fld('Мероприятие <span class="req">•</span>', '<textarea id="n_act"></textarea>') +
+    fld('Основание', '<textarea id="n_base" placeholder="дефект, несоответствие, пункт норматива"></textarea>') +
+    '<div class="grid2">' +
+      fld('Исполнитель', '<select id="n_perf"><option value="">— не назначен —</option>' + perfOpts + '</select>') +
+      fld('Срок выполнения', '<input type="date" id="n_term">') +
+    '</div>' +
+    fld('Ориентировочная стоимость, руб. с НДС', '<input type="text" id="n_cost">'),
+    '<button class="btn ghost" onclick="mClose()">Отмена</button>' +
+    '<button class="btn" id="n_ok">Добавить</button>');
+  $('n_ok').onclick = function(){
+    var act = $('n_act').value.trim();
+    if (!act){ toast('Впишите мероприятие', true); return; }
+    var rec = { manual:1, off:0, grp:$('n_grp').value, line:$('n_line').value.trim(),
+                num:$('n_num').value.trim(), actText:act, base:$('n_base').value.trim(),
+                performer:$('n_perf').value, term:$('n_term').value, cost:$('n_cost').value.trim() };
+    rec.key = PPO.actKey({ grp:rec.grp, line:rec.line, num:rec.num, act:act }) + '|ручное|' + PPO.uid();
+    D.acts = D.acts || []; D.acts.push(rec);
+    mClose(); commit(); toast('Мероприятие добавлено');
+  };
+}
+function actResetAll(){
+  if (!(D.acts||[]).length){ toast('Правок нет'); return; }
+  if (!confirm('Сбросить все назначения исполнителей, сроков и стоимости, а также добавленные ' +
+               'вручную позиции? Сами мероприятия останутся — они выводятся из дефектов и измерений.')) return;
+  D.acts = []; commit(); toast('Правки сброшены');
+}
+
+/* ========================================================= 3. ИЗМЕРЕНИЯ */
+function paintMeas(){
+  if (!D.meas.length){
+    $('measList').innerHTML = '<div class="empty"><b>Измерений пока нет</b>' +
+      'Нажмите «Добавить измерение» — программа спросит только замеренное число ' +
+      'и сама подставит норматив и вывод.</div>';
+    return;
+  }
+  $('measList').innerHTML = D.meas.map(function(m){
+    var bad = String(m.verdict||'').indexOf('не соответствует') === 0;
+    return '<div class="mrow" data-id="'+m.id+'">' +
+      '<div><div class="nm">'+esc(m.name)+'</div>' +
+      '<div class="meta">Опора № '+esc(m.pole||'—')+(m.line?' · '+esc(m.line):'')+
+      (m.si?' · '+esc(m.si):'')+'<br>'+esc(m.norm)+'</div></div>' +
+      '<div><div class="val">'+esc(m.value)+'<small>'+esc(m.unit==='—'?'':m.unit)+'</small></div>' +
+      '<div style="text-align:right;margin-top:5px"><span class="tag '+(bad?'bad':'ok')+'">'+esc(m.verdict)+'</span></div></div>' +
+      '</div>';
+  }).join('');
+  Array.prototype.forEach.call($('measList').querySelectorAll('.mrow'), function(el){
+    el.onclick = function(){ measEdit(el.dataset.id); };
+  });
+}
+function measEdit(id){
+  var m = D.meas.filter(function(x){ return x.id===id; })[0];
+  if (m) measForm(m, false);
+}
+function measNew(){ measForm({ id:PPO.uid(), kindId:'', vals:{} }, true); }
+
+function measForm(m, isNew){
+  var preset = D.poles.filter(function(p){ return p.num===m.pole && p.line===m.line; })
+                      .map(function(p){ return p.id; });
+  var siOpts = '<option value="">— не указано —</option>' + D.si.map(function(s){
+    return '<option'+(s.mark===m.si?' selected':'')+'>'+esc(s.mark||s.name)+'</option>'; }).join('');
+
+  mOpen(isNew ? 'Новое измерение' : 'Измерение',
+    fld('Что измеряли <span class="req">•</span>','<select id="m_kind"><option value="">— выберите —</option>' +
+      PPO.MEAS.map(function(k){ return '<option value="'+k.id+'"'+(k.id===m.kindId?' selected':'')+'>'+esc(k.name)+'</option>'; }).join('') +
+      '</select>','') +
+    '<div id="m_inputs"></div>' +
+    '<div class="vpreview idle" id="m_prev">Введите значение — вывод посчитается сам.</div>' +
+    '<div class="grid2" style="margin-top:14px">' +
+      fld('Опоры','<div id="m_pole"></div>',
+        isNew ? 'Можно отметить сразу несколько — значение запишется отдельной строкой на каждую опору.'
+              : 'При изменении записи привязка остаётся к одной опоре.') +
+      fld('Чем измеряли','<select id="m_si">'+siOpts+'</select><div id="m_sihint" class="note" style="margin-top:8px;display:none"></div>') +
+    '</div>',
+    [ isNew ? '' : '<button class="btn danger" id="m_del">Удалить</button>',
+      '<button class="btn ghost" onclick="mClose()">Отмена</button>',
+      '<button class="btn" id="m_ok">'+(isNew?'Добавить':'Сохранить')+'</button>' ].join('')
+  );
+
+  function paintInputs(){
+    var k = PPO.measById($('m_kind').value);
+    if (!k){ $('m_inputs').innerHTML = ''; preview(); return; }
+    $('m_inputs').innerHTML = '<div class="note" style="margin-top:0">'+esc(k.hint)+'</div><div class="grid2">' +
+      k.inputs.map(function(i){
+        var v = (m.vals && m.vals[i.k] !== undefined) ? m.vals[i.k] : (i.def !== undefined ? i.def : '');
+        return fld(esc(i.l),'<input type="number" step="'+i.step+'" data-i="'+i.k+'" value="'+esc(v)+'">');
+      }).join('') + '</div>';
+    Array.prototype.forEach.call($('m_inputs').querySelectorAll('[data-i]'), function(el){ el.oninput = preview; });
+    preview();
+  }
+  function readVals(){
+    var v = {};
+    Array.prototype.forEach.call($('m_inputs').querySelectorAll('[data-i]'), function(el){ v[el.dataset.i] = el.value; });
+    return v;
+  }
+  /* Норматив зависит от класса напряжения и характера местности КОНКРЕТНОЙ
+     опоры, а не от наибольшего класса объекта: на смешанном участке
+     0,4/10 кВ габарит провода до земли различается на метр. */
+  function ctxOf(p){ return p ? PPO.ctxForPole(p) : PPO.ctx(); }
+  function firstPole(){
+    var ps = (typeof pick !== 'undefined' && pick) ? pick.poles() : [];
+    if (ps.length) return ps[0];
+    if (m.pole) return PPO.poleByNum(m.pole, m.line);
+    return null;
+  }
+  function preview(){
+    var kid = $('m_kind').value;
+    if (!kid){ $('m_prev').className='vpreview idle'; $('m_prev').textContent='Сначала выберите, что измеряли.'; return null; }
+    var p0 = firstPole(), cc = ctxOf(p0);
+    var r = PPO.evalMeas(kid, readVals(), cc);
+    if (!r){ $('m_prev').className='vpreview idle';
+      $('m_prev').textContent='Введите значение — вывод посчитается сам.'; return null; }
+    var bad = PPO.isBadVerdict(r.verdict);
+    var many = (typeof pick !== 'undefined' && pick) ? pick.poles() : [];
+    var kvs = {}; many.forEach(function(x){ kvs[String(x.kv||'').trim() || '—'] = 1; });
+    var mixed = Object.keys(kvs).length > 1;
+    $('m_prev').className = 'vpreview ' + (bad?'bad':'ok');
+    $('m_prev').innerHTML = '<b>' + esc(r.value) + (r.unit==='—'?'':' '+esc(r.unit)) + ' — ' + esc(r.verdict) + '</b>' +
+      esc(r.norm) +
+      '<br><span style="font-size:12px;opacity:.85">Норматив по классу ' + esc(cc.kv || 'не задан') +
+        ' кВ, местность ' + esc(cc.mestnost || 'не задана') +
+        (p0 ? ' (опора № ' + esc(p0.num) + ')' : ' (общий по объекту — опора не выбрана)') + '</span>' +
+      (mixed ? '<br><span style="font-weight:600">Отмечены опоры разных классов напряжения — ' +
+               'вывод по каждой будет посчитан по её собственному классу.</span>' : '') +
+      (bad ? '<br><span style="font-weight:600">Попадёт в мероприятия отчёта.</span>' : '');
+    return r;
+  }
+  $('m_kind').onchange = function(){ m.vals = {}; paintInputs(); };
+  paintInputs();
+  var pick = PPO.mountPolePicker('m_pole', { value:preset, onChange:function(){ preview(); } });
+  preview();
+
+  if ($('m_del')) $('m_del').onclick = function(){
+    if (!confirm('Удалить измерение?')) return;
+    D.meas = D.meas.filter(function(x){ return x.id!==m.id; });
+    mClose(); commit(); toast('Измерение удалено');
+  };
+  /* Прибор должен уметь измерять именно эту величину. Поводом послужили
+     протоколы, в которых сопротивление заземляющего устройства «измерялось»
+     измерителем прочности бетона и тахеометром, а линейные расстояния — тем
+     же измерителем прочности. */
+  function siCheck(){
+    var hint = $('m_sihint'); if (!hint) return 1;
+    var kid = $('m_kind').value, siName = $('m_si').value;
+    if (!kid || !siName){ hint.style.display = 'none'; return 1; }
+    var rec = D.si.filter(function(x){ return (x.mark || x.name) === siName; })[0] || {};
+    var full = (rec.name || '') + ' ' + (rec.mark || siName);
+    var fit = PPO.siFits(full, kid);
+    if (fit === 1){ hint.style.display = 'none'; return 1; }
+    hint.style.display = '';
+    if (fit === 0){
+      var can = PPO.siKindsFor(kid);
+      hint.innerHTML = '<b style="color:#A32B2B">Прибор не измеряет эту величину.</b><br>' +
+        'Для измерения «' + esc(PPO.measById(kid).name.toLowerCase()) + '» применяется ' +
+        esc(can.length ? can.join(' либо ') : 'прибор соответствующего назначения') +
+        '. Выберите другой прибор или добавьте его в разделе «Приборы».';
+      return 0;
+    }
+    hint.innerHTML = 'Вид прибора не распознан по наименованию — проверьте карточку в разделе «Приборы». ' +
+      'В отчёте это попадёт в лист внутреннего контроля как замечание.';
+    return 1;
+  }
+  if ($('m_si')) $('m_si').onchange = siCheck;
+  siCheck();
+
+  $('m_ok').onclick = function(){
+    var r = preview();
+    if (!r){ toast('Не хватает данных для вывода', true); return; }
+    if (!siCheck()){ toast('Выбранный прибор не измеряет эту величину', true); return; }
+    var chosen = pick.poles();
+    /* Измерение без привязки к опоре не имеет доказательственной силы:
+       по нему нельзя ни повторить замер, ни соотнести его с конструкцией.
+       Раньше такая запись сохранялась молча и уходила в приложение Г. */
+    if (!chosen.length && !m.pole){
+      toast('Отметьте опору: измерение без привязки в протокол не принимается', true);
+      return;
+    }
+    /* значение и вывод пересчитываются ДЛЯ КАЖДОЙ опоры отдельно: одно и то же
+       измеренное число при разных классах напряжения даёт разный вывод */
+    function build(p, id){
+      var rr = PPO.evalMeas($('m_kind').value, readVals(), ctxOf(p)) || r;
+      return { id:id, kindId:rr.id, name:rr.name, place:rr.place, value:rr.value, unit:rr.unit,
+               norm:rr.norm, verdict:rr.verdict, si:$('m_si').value, vals:readVals(),
+               kv: p ? String(p.kv||'') : '',
+               pole: p?p.num:'', line: p?p.line:'', src:'ручной ввод' };
+    }
+    if (isNew){
+      if (!chosen.length) D.meas.push(build(null, m.id));
+      else chosen.forEach(function(p, i){ D.meas.push(build(p, i ? PPO.uid() : m.id)); });
+    } else {
+      var p0 = chosen[0] || null;
+      var rec = build(p0, m.id);
+      if (!p0){ rec.pole = m.pole||''; rec.line = m.line||''; }
+      D.meas = D.meas.map(function(x){ return x.id===m.id ? rec : x; });
+    }
+    mClose(); commit();
+    toast(isNew
+      ? (chosen.length > 1 ? 'Добавлено измерений: ' + chosen.length : 'Измерение добавлено')
+      : 'Сохранено');
+  };
+}
+
+/* ================================================================ 4. СИ */
+function paintSi(){
+  if (!D.si.length){
+    $('siList').innerHTML = '<div class="empty"><b>Приборов пока нет</b>' +
+      'Добавьте хотя бы одно средство измерения — без него измерения нельзя включить в отчёт.</div>';
+    return;
+  }
+  var today = new Date();
+  $('siList').innerHTML = D.si.map(function(s, i){
+    var st = '', cls = 'ok';
+    if (s.d2){
+      var left = Math.round((new Date(s.d2) - today)/86400000);
+      if (left < 0){ st = 'поверка истекла'; cls='bad'; }
+      else if (left < 60){ st = 'до конца поверки ' + left + ' дн.'; cls='warn'; }
+      else st = 'поверка действует до ' + PPO.fmtDate(s.d2);
+    } else { st = 'срок поверки не указан'; cls='warn'; }
+    return '<div class="sirow"><div class="top"><div>' +
+      '<div style="font-weight:700">'+esc(s.mark||s.name)+'</div>' +
+      '<div class="mini">'+esc(s.name)+(s.sn?' · зав. № '+esc(s.sn):'')+'</div>' +
+      '<div class="mini">'+(s.fgis?'ФГИС «Аршин»: '+esc(s.fgis):'<span style="color:var(--warn)">запись во ФГИС «Аршин» не указана</span>')+'</div>' +
+      '</div><div style="text-align:right"><span class="tag '+cls+'">'+esc(st)+'</span>' +
+      '<div style="margin-top:8px"><button class="btn ghost sm" data-e="'+i+'">Изменить</button></div></div></div></div>';
+  }).join('');
+  Array.prototype.forEach.call($('siList').querySelectorAll('[data-e]'), function(b){
+    b.onclick = function(){ siForm(+b.dataset.e); };
+  });
+}
+function siNew(){ siForm(-1); }
+function siForm(i){
+  var s = i>=0 ? D.si[i] : { name:'', mark:'', sn:'', fgis:'', d1:'', d2:'' };
+  mOpen(i>=0 ? 'Средство измерения' : 'Новое средство измерения',
+    fld('Типовой прибор','<select id="s_pre"><option value="">— выбрать из списка —</option>' +
+      PPO.SI_PRESETS.map(function(p,k){
+        return '<option value="'+k+'">'+(p.own?'★ ':'')+esc(p.mark)+' — '+esc(p.name)+
+               (p.sn?' · зав. № '+esc(p.sn):'')+'</option>'; }).join('') +
+      '</select>','Звёздочкой отмечены приборы подразделения: по ним подставятся заводской номер, запись о поверке во ФГИС «Аршин» и её дата. Дальше правьте вручную.') +
+    '<div class="grid2">' +
+      fld('Наименование <span class="req">•</span>','<input type="text" id="s_name" value="'+esc(s.name)+'" placeholder="Измеритель прочности бетона">') +
+      fld('Тип / марка <span class="req">•</span>','<input type="text" id="s_mark" value="'+esc(s.mark)+'" placeholder="ИПС-МГ4.03">') +
+      fld('Заводской №','<input type="text" id="s_sn" value="'+esc(s.sn)+'">') +
+      fld('№ записи о поверке во ФГИС «Аршин»','<input type="text" id="s_fgis" value="'+esc(s.fgis)+'" placeholder="С-ВЮ/30-12-2025/________">') +
+      fld('Дата поверки','<input type="date" id="s_d1" value="'+esc(s.d1)+'">') +
+      fld('Поверка действительна до','<input type="date" id="s_d2" value="'+esc(s.d2)+'">') +
+    '</div>' +
+    '<p class="mini">Проверить запись можно в реестре ФГИС «Аршин»: ' +
+    '<a href="https://fgis.gost.ru/fundmetrology/cm/results" target="_blank" rel="noopener">fgis.gost.ru</a></p>',
+    [ i>=0 ? '<button class="btn danger" id="s_del">Удалить</button>' : '',
+      '<button class="btn ghost" onclick="mClose()">Отмена</button>',
+      '<button class="btn" id="s_ok">Сохранить</button>' ].join(''));
+  $('s_pre').onchange = function(){
+    var p = PPO.SI_PRESETS[+this.value];
+    if (!p) return;
+    $('s_name').value = p.name; $('s_mark').value = p.mark;
+    /* У приборов, закреплённых за подразделением, в справочнике есть заводской
+       номер и запись о поверке — подставляем их, чтобы реквизиты не заносились
+       заново и не расходились между отчётами. Срок действия поверки считается
+       от даты поверки: год минус день. */
+    if (p.sn)   $('s_sn').value = p.sn;
+    if (p.fgis) $('s_fgis').value = p.fgis;
+    if (p.d1){
+      $('s_d1').value = p.d1;
+      var d = new Date(p.d1); d.setFullYear(d.getFullYear()+1); d.setDate(d.getDate()-1);
+      $('s_d2').value = d.toISOString().slice(0,10);
+    }
+  };
+  $('s_d1').onchange = function(){
+    if (this.value && !$('s_d2').value){
+      var d = new Date(this.value); d.setFullYear(d.getFullYear()+1); d.setDate(d.getDate()-1);
+      $('s_d2').value = d.toISOString().slice(0,10);
+    }
+  };
+  if ($('s_del')) $('s_del').onclick = function(){
+    if (!confirm('Удалить прибор?')) return;
+    D.si.splice(i,1); mClose(); commit(); toast('Прибор удалён');
+  };
+  $('s_ok').onclick = function(){
+    var o = { name:$('s_name').value.trim(), mark:$('s_mark').value.trim(), sn:$('s_sn').value.trim(),
+              fgis:$('s_fgis').value.trim(), d1:$('s_d1').value, d2:$('s_d2').value };
+    if (!o.name || !o.mark){ toast('Заполните наименование и марку', true); return; }
+    if (i>=0) D.si[i] = o; else D.si.push(o);
+    mClose(); commit(); toast('Сохранено');
+  };
+}
+
+/* ===== ПРОСМОТР ФОТО (с зумом) — общий с разделом «Карта» ===== */
+var lbPhotos=[], lbIndex=0;
+var lbScale=1, lbTx=0, lbTy=0, lbPointers=new Map(), lbLastDist=0, lbPanStart=null, lbTapTime=0;
+function lbImgEl(){ return document.getElementById("lbImg"); }
+function lbApply(){ lbImgEl().style.transform="translate("+lbTx+"px,"+lbTy+"px) scale("+lbScale+")"; }
+function lbZoomReset(){ lbScale=1; lbTx=0; lbTy=0; lbApply(); }
+function lbSetScale(s){ lbScale=Math.min(6,Math.max(1,s)); if(lbScale<=1){ lbScale=1; lbTx=0; lbTy=0; } lbApply(); }
+function lbZoom(dir){ lbSetScale(lbScale*(dir>0?1.4:1/1.4)); }
+function openLightbox(photos,i){
+  var box=document.getElementById("lightbox");
+  if(!box){ toast('Просмотрщик не найден на странице', true); return; }
+  if(!photos || !photos.length){ toast('Нечего показывать: список фотографий пуст', true); return; }
+  lbPhotos=photos; lbIndex=i||0;
+  box.classList.add("on"); document.body.style.overflow='hidden';
+  showLb();
+}
+function showLb(){ if(!lbPhotos.length) return; var ph=lbPhotos[lbIndex];
+  lbImgEl().src=ph.url; lbZoomReset();
+  document.getElementById("lbCap").textContent=(ph.name||"фото")+"  ·  "+(lbIndex+1)+" / "+lbPhotos.length+"  ·  колесо / щипок — зум, двойной тап — приблизить";
+  var multi=lbPhotos.length>1;
+  document.querySelector(".lb-prev").style.display=multi?"block":"none";
+  document.querySelector(".lb-next").style.display=multi?"block":"none";
+}
+function lbNext(){ if(lbPhotos.length){ lbIndex=(lbIndex+1)%lbPhotos.length; showLb(); } }
+function lbPrev(){ if(lbPhotos.length){ lbIndex=(lbIndex-1+lbPhotos.length)%lbPhotos.length; showLb(); } }
+function closeLightbox(){
+  document.getElementById("lightbox").classList.remove("on");
+  lbImgEl().src=""; lbZoomReset();
+  /* карточка опоры могла остаться открытой — прокрутку возвращаем только если модалки нет */
+  if(!$('modal').classList.contains('on')) document.body.style.overflow='';
+}
+function lbDist(){ var p=Array.from(lbPointers.values()); return Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y); }
+function initLightbox(){
+  var stage=document.getElementById("lbStage"), img=lbImgEl();
+  stage.addEventListener("wheel",function(e){ e.preventDefault(); lbSetScale(lbScale*(e.deltaY<0?1.15:1/1.15)); },{passive:false});
+  stage.addEventListener("pointerdown",function(e){ stage.setPointerCapture(e.pointerId); lbPointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(lbPointers.size===1){ lbPanStart={x:e.clientX-lbTx,y:e.clientY-lbTy}; img.classList.add("grabbing");
+      var now=Date.now(); if(now-lbTapTime<300) lbSetScale(lbScale>1?1:2.5); lbTapTime=now; }
+    else if(lbPointers.size===2){ lbLastDist=lbDist(); } });
+  stage.addEventListener("pointermove",function(e){ if(!lbPointers.has(e.pointerId)) return; lbPointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(lbPointers.size===2){ var d=lbDist(); if(lbLastDist) lbSetScale(lbScale*(d/lbLastDist)); lbLastDist=d; }
+    else if(lbPointers.size===1 && lbScale>1 && lbPanStart){ lbTx=e.clientX-lbPanStart.x; lbTy=e.clientY-lbPanStart.y; lbApply(); } });
+  function up(e){ lbPointers.delete(e.pointerId); if(lbPointers.size<2) lbLastDist=0;
+    if(lbPointers.size===1){ var p=Array.from(lbPointers.values())[0]; lbPanStart={x:p.x-lbTx,y:p.y-lbTy}; } else { img.classList.remove("grabbing"); } }
+  stage.addEventListener("pointerup",up); stage.addEventListener("pointercancel",up);
+  document.addEventListener("keydown",function(e){
+    if(!document.getElementById("lightbox").classList.contains("on")) return;
+    if(e.key==="Escape") closeLightbox(); else if(e.key==="ArrowRight") lbNext(); else if(e.key==="ArrowLeft") lbPrev();
+    else if(e.key==="+"||e.key==="=") lbZoom(1); else if(e.key==="-") lbZoom(-1); });
+}
+
+/* Просмотр всех фотографий опоры — из списка и из карточки. */
+function showPolePhotos(poleId, startAt){
+  var p = D.poles.filter(function(x){ return x.id === poleId; })[0];
+  if (!p || !(p.photos||[]).length){ toast('У этой опоры нет фотографий', true); return; }
+  Promise.all(p.photos.map(function(pid){
+    return PPO.photoGet(pid).then(function(r){ return r; }).catch(function(){ return null; });
+  })).then(function(list){
+    var gallery = list.filter(Boolean).map(function(rec, i){
+      return { url: URL.createObjectURL(rec.blob),
+               name: 'опора № ' + (p.num || '?') + (p.line ? ' · ' + p.line : '') +
+                     ' · фото ' + (i+1) };
+    });
+    if (!gallery.length){
+      toast('Файлы фотографий не найдены в хранилище браузера — снимки делались в другом браузере или данные сайта очищены', true);
+      return;
+    }
+    openLightbox(gallery, startAt || 0);
+  });
+}
+
+/* ============================================================ ЛИНИИ */
+function paintLines(){
+  var cnt = {};
+  D.poles.forEach(function(p){ var k = p.line || ''; cnt[k] = (cnt[k]||0)+1; });
+  var named = {};
+  D.lines.forEach(function(l){ if (l.line) named[l.line] = 1; });
+  var orphan = Object.keys(cnt).filter(function(k){ return k && !named[k]; });
+
+  $('lineList').innerHTML = (D.lines.length ? '<div class="tblwrap"><table class="tbl"><tr>' +
+    '<th>Линия / фидер</th><th>Инв. №</th><th>Год</th><th>Класс, кВ</th><th>Основание права</th><th>Опор</th><th></th></tr>' +
+    D.lines.map(function(x,i){
+      var n = cnt[x.line] || 0;
+      return '<tr><td><b>'+esc(x.line)+'</b>'+(x.disp?'<br><span class="mini">'+esc(x.disp)+'</span>':'')+'</td>' +
+        '<td>'+(x.inv?esc(x.inv):'<span style="color:#B26A00">не указан</span>')+'</td>' +
+        '<td>'+esc(x.year||'')+'</td><td>'+esc(x.kv||'')+'</td>' +
+        '<td>'+(x.right?esc(x.right):'<span style="color:#B26A00">не указано</span>')+'</td>' +
+        '<td>'+(n?n:'<span style="color:#B26A00">0</span>')+'</td>' +
+        '<td><button class="btn ghost sm" data-l="'+i+'">Изменить</button></td></tr>'; }).join('') +
+    '</table></div>'
+    : '<div class="empty"><b>Линии не описаны</b>Без инвентарных номеров и оснований права отчёт не проходит внутренний контроль.</div>') +
+    (orphan.length ? '<div class="empty" style="margin-top:10px;border-color:#EAD3A8;background:#FDF7EC">' +
+      '<b>Есть опоры на неописанных линиях</b>' + esc(orphan.join('; ')) +
+      '<br>Нажмите «Собрать из заведённых опор» — карточки создадутся сами.</div>' : '');
+  Array.prototype.forEach.call($('lineList').querySelectorAll('[data-l]'), function(b){
+    b.onclick = function(){ lineForm(+b.dataset.l); };
+  });
+}
+function lineForm(i){
+  var x = i>=0 ? D.lines[i] : { id:PPO.uid(), line:'', disp:'', inv:'', year:'', kv:'', right:'', repair:'', claims:'' };
+  mOpen(i>=0 ? 'Линия' : 'Новая линия',
+    fld('Линия / фидер <span class="req">•</span>','<input type="text" id="l_line" value="'+esc(x.line)+'" placeholder="ВЛ 10 - Сщ-2">',
+        'Пишите ровно так же, как в карточках опор: связь устанавливается по совпадению текста.') +
+    fld('Диспетчерское наименование','<input type="text" id="l_disp" value="'+esc(x.disp)+'" placeholder="ВЛ 10 кВ Сщ-2 от ПС 35/10 кВ Щербиновская">') +
+    '<div class="grid2">' +
+      fld('Инвентарный номер','<input type="text" id="l_inv" value="'+esc(x.inv)+'">') +
+      fld('Год ввода','<input type="number" id="l_year" value="'+esc(x.year)+'">') +
+      fld('Класс напряжения, кВ','<select id="l_kv"><option value=""></option>' +
+        PPO.LISTS.kv.map(function(k){ return '<option'+(k===x.kv?' selected':'')+'>'+k+'</option>'; }).join('') + '</select>') +
+      fld('Основание права','<input type="text" id="l_right" value="'+esc(x.right)+'" placeholder="собственность, ЕГРН от __.__.____ № ____">') +
+    '</div>' +
+    fld('Планы ремонта и реконструкции','<textarea id="l_rep">'+esc(x.repair||'')+'</textarea>') +
+    fld('Иные заявки на участок','<textarea id="l_cl">'+esc(x.claims||'')+'</textarea>'),
+    [ i>=0?'<button class="btn danger" id="l_del">Удалить</button>':'',
+      '<button class="btn ghost" onclick="mClose()">Отмена</button>',
+      '<button class="btn" id="l_ok">Сохранить</button>' ].join(''));
+  if ($('l_del')) $('l_del').onclick = function(){ D.lines.splice(i,1); mClose(); commit(); };
+  $('l_ok').onclick = function(){
+    var o = { id:x.id, line:$('l_line').value.trim(), disp:$('l_disp').value.trim(),
+              inv:$('l_inv').value.trim(), year:$('l_year').value, kv:$('l_kv').value,
+              right:$('l_right').value.trim(), repair:$('l_rep').value.trim(), claims:$('l_cl').value.trim() };
+    if (!o.line){ toast('Укажите наименование линии', true); return; }
+    if (i>=0) D.lines[i]=o; else D.lines.push(o);
+    mClose(); commit(); toast('Сохранено');
+  };
+}
+function linesFromPoles(){
+  var have = {}; D.lines.forEach(function(l){ have[l.line] = 1; });
+  var seen = {}, added = 0;
+  D.poles.forEach(function(p){
+    var k = p.line || '';
+    if (!k || have[k] || seen[k]) return;
+    seen[k] = 1; added++;
+    D.lines.push({ id:PPO.uid(), line:k, disp:'', inv:'', year:'', kv:p.kv||'', right:'', repair:'', claims:'' });
+  });
+  commit();
+  toast(added ? ('Создано карточек: ' + added + '. Заполните инвентарные номера.') : 'Новых линий не найдено');
+}
+
+/* ============================================================ 5. КАБЕЛИ */
+function paintCab(){
+  $('cabList').innerHTML = D.cables.length ? '<div class="tblwrap"><table class="tbl"><tr>' +
+    '<th>Марка</th><th>Тип</th><th>Ø, мм</th><th>Масса, кг/км</th><th>Высота подвеса, м</th><th>Класс, кВ</th><th></th></tr>' +
+    D.cables.map(function(x,i){
+      var r = PPO.cableByMark(x.mark)||{};
+      return '<tr><td><b>'+esc(x.mark)+'</b></td><td>'+esc(r.type||'')+'</td><td>'+esc(r.d||'')+'</td>' +
+        '<td>'+esc(r.m||'')+'</td><td>'+esc(x.h||'')+'</td><td>'+esc(x.kv||'все классы')+'</td>' +
+        '<td><button class="btn ghost sm" data-c="'+i+'">Изменить</button></td></tr>'; }).join('') +
+    '</table></div>' : '<div class="empty"><b>Кабель не указан</b>Без него оценка несущей способности пойдёт без нового подвеса.</div>';
+  Array.prototype.forEach.call($('cabList').querySelectorAll('[data-c]'), function(b){
+    b.onclick = function(){ cabForm(+b.dataset.c); };
+  });
+
+  $('wirList').innerHTML = D.wires.length ? '<div class="tblwrap"><table class="tbl"><tr>' +
+    '<th>Марка</th><th>Кол-во</th><th>Ø, мм</th><th>Высота, м</th><th>Тяжение, кН</th><th>Класс, кВ</th><th>Принадлежность</th><th></th></tr>' +
+    D.wires.map(function(x,i){
+      var r = PPO.wireByMark(x.mark)||PPO.cableByMark(x.mark)||{};
+      return '<tr><td><b>'+esc(x.mark)+'</b></td><td>'+esc(x.n)+'</td><td>'+esc(r.d||'')+'</td>' +
+        '<td>'+esc(x.h||'')+'</td><td>'+(x.tens?esc(x.tens):'<span style="color:#B26A00">не задано</span>')+'</td>' +
+        '<td>'+esc(x.kv||'все классы')+'</td><td>'+esc(x.belong||'')+'</td>' +
+        '<td><button class="btn ghost sm" data-w="'+i+'">Изменить</button></td></tr>'; }).join('') +
+    '</table></div>' : '<div class="empty"><b>Подвеска не описана</b>Укажите провода ВЛ и грозотрос — иначе оценка занизит фактическую нагрузку.</div>';
+  Array.prototype.forEach.call($('wirList').querySelectorAll('[data-w]'), function(b){
+    b.onclick = function(){ wirForm(+b.dataset.w); };
+  });
+}
+function cabNew(){ cabForm(-1); }
+function cabForm(i){
+  var x = i>=0 ? D.cables[i] : { mark:'', kv:'', h:'', tens:'', arm:'', note:'' };
+  mOpen(i>=0?'Размещаемый кабель':'Новый размещаемый кабель',
+    fld('Марка <span class="req">•</span>','<select id="c_mark"><option value="">— выберите —</option>' +
+      PPO.CABLES.map(function(o){ return '<option'+(o.mark===x.mark?' selected':'')+'>'+esc(o.mark)+'</option>'; }).join('')+'</select>','') +
+    '<div class="grid2">' +
+      fld('Высота подвеса, м','<input type="number" step="0.1" id="c_h" value="'+esc(x.h)+'">','Не меньше нормируемого габарита ОК до земли (5,0 м) плюс расчётная стрела провеса.') +
+      fld('Класс напряжения размещения','<select id="c_kv"><option value="все классы">все классы</option>' +
+        PPO.LISTS.kv.map(function(k){ return '<option'+(k===(x.kv||'')?' selected':'')+'>'+k+'</option>'; }).join('') + '</select>','Если объект включает несколько классов, отнесите кабель к своему — иначе нагрузка учтётся на всех опорах.') +
+      fld('Монтажное тяжение, кН','<input type="number" step="0.1" id="c_tens" value="'+esc(x.tens)+'">','Пусто — берётся допустимое тяжение марки.') +
+      fld('Линейная арматура','<input type="text" id="c_arm" value="'+esc(x.arm)+'" placeholder="спиральная натяжная и поддерживающая">') +
+    '</div>' + fld('Примечание','<input type="text" id="c_note" value="'+esc(x.note)+'">'),
+    [ i>=0?'<button class="btn danger" id="c_del">Удалить</button>':'',
+      '<button class="btn ghost" onclick="mClose()">Отмена</button>',
+      '<button class="btn" id="c_ok">Сохранить</button>' ].join(''));
+  function info(){
+    var r = PPO.cableByMark($('c_mark').value);
+    $('c_mark').closest('.field').querySelector('.hint').innerHTML = r ?
+      esc(r.type)+'<br>Ø '+r.d+' мм · '+r.m+' кг/км · тяжение '+r.t+' кН · применение '+esc(r.area)+' кВ' : '';
+  }
+  $('c_mark').closest('.field').insertAdjacentHTML('beforeend','<div class="hint"></div>');
+  $('c_mark').onchange = info; info();
+  if ($('c_del')) $('c_del').onclick = function(){ D.cables.splice(i,1); mClose(); commit(); };
+  $('c_ok').onclick = function(){
+    if (!$('c_mark').value){ toast('Выберите марку', true); return; }
+    var o = { mark:$('c_mark').value, kv:$('c_kv').value, h:$('c_h').value, tens:$('c_tens').value,
+              arm:$('c_arm').value.trim(), note:$('c_note').value.trim() };
+    /* габарит проверяем по классу, на котором размещается кабель */
+    var vr = PPO.vlByKv(/^\d/.test(o.kv) ? o.kv : PPO.ctx().kv), need = vr ? vr.g_oksn : 5;
+    if (parseFloat(o.h) > 0 && parseFloat(o.h) < need){
+      toast('Высота подвеса ' + o.h + ' м меньше нормируемого габарита ' + need + ' м', true); return;
+    }
+    if (i>=0) D.cables[i]=o; else D.cables.push(o);
+    mClose(); commit(); toast('Сохранено');
+  };
+}
+function wirNew(){ wirForm(-1); }
+function wirForm(i){
+  var x = i>=0 ? D.wires[i] : { mark:'', n:3, kv:'', h:'', tens:'', belong:PPO.LISTS.belong[0], note:'' };
+  var all = PPO.WIRES.map(function(o){return o.mark;}).concat(PPO.CABLES.map(function(o){return o.mark;}));
+  mOpen(i>=0?'Позиция подвески':'Новая позиция подвески',
+    fld('Марка провода / троса / кабеля <span class="req">•</span>','<select id="w_mark"><option value="">— выберите —</option>' +
+      all.map(function(mk){ return '<option'+(mk===x.mark?' selected':'')+'>'+esc(mk)+'</option>'; }).join('')+'</select>') +
+    '<div class="grid2">' +
+      fld('Количество в подвесе, шт','<input type="number" id="w_n" value="'+esc(x.n)+'" min="1">') +
+      fld('Высота подвеса, м','<input type="number" step="0.1" id="w_h" value="'+esc(x.h)+'">') +
+      fld('Принадлежность','<select id="w_b">'+PPO.LISTS.belong.map(function(b){
+        return '<option'+(b===x.belong?' selected':'')+'>'+esc(b)+'</option>'; }).join('')+'</select>') +
+      fld('Класс напряжения','<select id="w_kv"><option value="все классы">все классы</option>' +
+        PPO.LISTS.kv.map(function(k){ return '<option'+(k===(x.kv||'')?' selected':'')+'>'+k+'</option>'; }).join('') + '</select>','Провода 10 кВ не должны нагружать опоры 0,4 кВ — отнесите позицию к своему классу.') +
+      fld('Монтажное тяжение, кН','<input type="number" step="0.1" id="w_tens" value="'+esc(x.tens)+'">','Нужно для оценки момента на анкерных и угловых опорах.') +
+      fld('Примечание','<input type="text" id="w_note" value="'+esc(x.note)+'">') +
+    '</div>',
+    [ i>=0?'<button class="btn danger" id="w_del">Удалить</button>':'',
+      '<button class="btn ghost" onclick="mClose()">Отмена</button>',
+      '<button class="btn" id="w_ok">Сохранить</button>' ].join(''));
+  if ($('w_del')) $('w_del').onclick = function(){ D.wires.splice(i,1); mClose(); commit(); };
+  $('w_ok').onclick = function(){
+    if (!$('w_mark').value){ toast('Выберите марку', true); return; }
+    var o = { mark:$('w_mark').value, n:+$('w_n').value||1, kv:$('w_kv').value, h:$('w_h').value,
+              tens:$('w_tens').value, belong:$('w_b').value, note:$('w_note').value.trim() };
+    if (i>=0) D.wires[i]=o; else D.wires.push(o);
+    mClose(); commit(); toast('Сохранено');
+  };
+}
+
+/* ========================================================== 6. ПРОВЕРКА */
+function paintReady(){
+  var r = PPO.readiness(), pr = PPO.problems();
+  var stop = pr.filter(function(x){return x.lv==='stop';});
+  var warn = pr.filter(function(x){return x.lv==='warn';});
+  $('readyCard').innerHTML =
+    '<div class="ready" style="margin-bottom:16px">' +
+      '<div class="ring" style="--p:'+r.pct+'"><i>'+r.pct+'%</i></div>' +
+      '<div><h2 style="margin:0">Готовность к выпуску отчёта</h2>' +
+      '<p class="sub" style="margin:2px 0 0">' +
+        (stop.length ? stop.length + ' замечаний блокируют выпуск' : 'Блокирующих замечаний нет') +
+        (warn.length ? ' · ' + warn.length + ' стоит проверить' : '') + '</p></div>' +
+    '</div>' +
+    (stop.length ? '<h3 class="blk">Нужно исправить</h3>' + pr2html(stop, 'bad') : '') +
+    (warn.length ? '<h3 class="blk">Стоит проверить</h3>' + pr2html(warn, 'warn') : '') +
+    (!pr.length ? '<div class="note ok"><b>Всё заполнено</b>Данных достаточно для сборки отчёта.</div>' : '');
+}
+function pr2html(list, cls){
+  return '<div class="tblwrap"><table class="tbl"><tr><th style="width:34%">Где</th><th>Что не так</th></tr>' +
+    list.map(function(x){ return '<tr><td><span class="tag '+cls+'">'+esc(x.where)+'</span></td><td>'+esc(x.txt)+'</td></tr>'; }).join('') +
+    '</table></div>';
+}
+function toReport(){
+  toast('Собираю книгу шаблона…');
+  PPO.handoff().then(function(){ location.href = 'index.html'; })
+    .catch(function(e){ toast('Не удалось передать данные: '+e.message, true); });
+}
+function dlXlsx(){
+  toast('Заполняю шаблон…');
+  PPO.exportXlsx().then(function(r){
+    toast('Файл сохранён: ' + r.name);
+    $('xlsMsg').innerHTML = r.fromTemplate
+      ? '<div class="note ok"><b>Заполнен ID_shablon.xlsx</b>Формулы, справочники и выпадающие списки шаблона сохранены — файл можно править в Excel и загрузить обратно.</div>'
+      : '<div class="note warn"><b>Шаблон не найден рядом со страницей</b>Книга собрана значениями без формул. Положите ID_shablon.xlsx в ту же папку, что и страницы — тогда будет заполняться настоящий шаблон.</div>';
+  }).catch(function(e){ toast('Ошибка выгрузки: '+e.message, true); });
+}
+document.getElementById('impXls').onchange = function(e){
+  var f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  if (D.poles.length || Object.keys(D.pass).length){
+    if (!confirm('Данные из файла заменят то, что сейчас внесено в осмотр.\n' +
+                 'Фотографии останутся, но привязка к опорам потеряется.\n\nПродолжить?')) return;
+  }
+  var rd = new FileReader();
+  rd.onload = function(ev){
+    try {
+      var wb = XLSX.read(new Uint8Array(ev.target.result), { type:'array' });
+      D = PPO.importWorkbook(wb);
+      paintPass(); paintAll();
+      $('xlsMsg').innerHTML = '<div class="note ok"><b>Шаблон прочитан</b>Опор: ' + D.poles.length +
+        ', измерений: ' + D.meas.length + ', приборов: ' + D.si.length + '.</div>';
+      toast('Данные из шаблона загружены');
+    } catch(err){
+      $('xlsMsg').innerHTML = '<div class="note bad"><b>Файл не прочитан</b>' + esc(err.message) +
+        '<br>Проверьте, что это ID_shablon.xlsx и названия листов не менялись.</div>';
+    }
+  };
+  rd.readAsArrayBuffer(f);
+};
+
+/* ---------------------------------------------------- резервная копия */
+document.getElementById('btnBackup').onclick = function(){
+  var b = this;
+  b.disabled = true;
+  toast('Готовлю копию, фотографии упаковываются…');
+  PPO.exportJson(function(done, all){
+    if (all) $('xlsMsg').innerHTML = '<div class="note"><b>Упаковка фотографий</b>' + done + ' из ' + all + '</div>';
+  }).then(function(r){
+    b.disabled = false;
+    $('xlsMsg').innerHTML = '<div class="note ok"><b>Копия сохранена</b>Опор: ' + r.poles +
+      ', фотографий в копии: ' + r.photos + '.</div>';
+    toast('Резервная копия сохранена');
+  }).catch(function(e){
+    b.disabled = false;
+    $('xlsMsg').innerHTML = '<div class="note bad"><b>Копия не сохранена</b>' + esc(e.message) + '</div>';
+    toast('Ошибка сохранения копии', true);
+  });
+};
+document.getElementById('impJson').onchange = function(e){
+  var f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  if (!confirm('Восстановление полностью заменит текущий осмотр и его фотографии.\n\nПродолжить?')) return;
+  toast('Восстанавливаю…');
+  PPO.importJson(f).then(function(r){
+    D = PPO.load();
+    paintPass(); paintAll();
+    $('xlsMsg').innerHTML = '<div class="note ok"><b>Копия восстановлена</b>Опор: ' + r.poles +
+      ', фотографий: ' + r.photos + '.</div>';
+    toast('Осмотр восстановлен');
+  }).catch(function(err){
+    $('xlsMsg').innerHTML = '<div class="note bad"><b>Копия не прочитана</b>' + esc(err.message) + '</div>';
+    toast('Ошибка восстановления', true);
+  });
+};
+
+/* --------------------------------------------------------------- модалка */
+function fld(label, input, hint){
+  return '<div class="field"><label>'+label+'</label>'+input+(hint?'<div class="hint">'+hint+'</div>':'')+'</div>';
+}
+function mOpen(title, body, foot){
+  $('mTitle').innerHTML = title; $('mBody').innerHTML = body; $('mFoot').innerHTML = foot;
+  $('modal').classList.add('on'); document.body.style.overflow='hidden';
+}
+function mClose(){ $('modal').classList.remove('on'); document.body.style.overflow=''; }
+$('modal').onclick = function(e){ if (e.target===$('modal')) mClose(); };
+document.addEventListener('keydown', function(e){
+  if (e.key !== 'Escape') return;
+  /* сначала закрываем просмотр фото, карточку — только если он не открыт */
+  if (document.getElementById('lightbox').classList.contains('on')) return;
+  mClose();
+});
+
+/* ------------------------------------------------------------------ старт */
+function paintAll(){
+  paintTabs(); paintAuto(); paintObjLine(); paintLines(); paintPoles(); paintSkips(); paintDefects();
+  paintActs(); paintMeas(); paintSi(); paintCab();
+  if (cur==='out') paintReady();
+}
+$('lineAdd').onclick = function(){ lineForm(-1); };
+$('lineFromPoles').onclick = linesFromPoles;
+initLightbox();
+PPO.mountNav('osmotr.html');
+paintPass();
+go(TABS.some(function(t){return t.id===cur;}) ? cur : 'obj');
+paintAll();
+
+/* приём измерения из приборных калькуляторов */
+(function(){
+  var raw = sessionStorage.getItem('ppo_meas_in');
+  if (!raw) return;
+  sessionStorage.removeItem('ppo_meas_in');
+  try {
+    var inc = JSON.parse(raw);
+    inc.forEach(function(r){ r.id = PPO.uid(); D.meas.push(r); });
+    commit(); go('meas');
+    toast('Из приборов добавлено измерений: ' + inc.length);
+  } catch(e){}
+})();
+</script>
+</body>
+</html>

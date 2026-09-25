@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Рабочее место ППО ВОЛС · осмотр, измерения, отчёт по п. 13 Правил</title>
+<link rel="stylesheet" href="ppo-ui.css?v=3.6.3">
+<style>
+.hero{background:var(--paper);border:1px solid var(--line-s);border-radius:14px;box-shadow:var(--sh);
+  padding:24px;margin-bottom:18px;display:grid;grid-template-columns:1fr auto;gap:22px;align-items:center}
+.hero h1{margin:0 0 8px;font-size:24px;letter-spacing:-.02em;line-height:1.22}
+.hero p{margin:0;color:var(--muted);font-size:14px;max-width:62ch}
+.state{border-left:3px solid var(--blue-l);padding-left:16px;min-width:230px}
+.state .obj{font-weight:700;font-size:15px;margin-bottom:8px;word-break:break-word}
+.state .row{display:flex;justify-content:space-between;font-size:13px;padding:3px 0;gap:12px}
+.state .row span{color:var(--muted)}
+.state .row b{font-variant-numeric:tabular-nums}
+
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:14px}
+.tile{background:var(--paper);border:1px solid var(--line-s);border-radius:var(--r);box-shadow:var(--sh);
+  padding:18px;text-decoration:none;color:inherit;display:flex;flex-direction:column;
+  border-top:3px solid var(--blue);transition:transform .16s, box-shadow .16s}
+.tile:hover{transform:translateY(-2px);box-shadow:0 6px 22px rgba(15,30,46,.13)}
+.tile .step{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--blue);font-weight:700;margin-bottom:8px}
+.tile h3{margin:0 0 7px;font-size:17px}
+.tile p{margin:0 0 12px;font-size:13.5px;color:var(--muted);flex:1;line-height:1.45}
+.tile .go{font-size:13px;font-weight:700;color:var(--blue)}
+.tile.secondary{border-top-color:var(--line)}
+.tile.secondary .step,.tile.secondary .go{color:var(--muted)}
+
+.flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--muted);
+  background:#fff;border:1px solid var(--line-s);border-radius:10px;padding:12px 14px;margin-bottom:18px}
+.flow b{color:var(--ink);background:var(--blue-l);padding:4px 10px;border-radius:999px;font-size:12.5px}
+.flow i{font-style:normal;color:var(--blue-2);font-weight:700}
+/* ---------- встроенная инструкция ---------- */
+.guide{background:var(--paper);border:1px solid var(--line-s);border-radius:var(--r);
+  box-shadow:var(--sh);margin-top:18px;overflow:hidden}
+.guide > .gh{padding:18px 20px;border-bottom:1px solid var(--line-s)}
+.guide > .gh h2{margin:0 0 4px;font-size:19px}
+.guide > .gh p{margin:0;color:var(--muted);font-size:13.5px}
+.gitem{border-bottom:1px solid var(--line-s)}
+.gitem:last-child{border-bottom:0}
+.gitem > summary{list-style:none;cursor:pointer;padding:14px 20px;display:flex;gap:13px;align-items:center}
+.gitem > summary::-webkit-details-marker{display:none}
+.gitem .gn{width:28px;height:28px;flex:0 0 auto;border-radius:50%;background:var(--blue-l);color:var(--blue-d);
+  display:grid;place-items:center;font-weight:800;font-size:13px}
+.gitem[open] .gn{background:var(--blue);color:#fff}
+.gitem .gt{flex:1}
+.gitem .gt b{display:block;font-size:15.5px;font-weight:700}
+.gitem .gt span{display:block;font-size:12.5px;color:var(--muted);margin-top:1px}
+.gitem .gc{margin-left:auto;color:var(--muted);font-size:13px;font-weight:700;flex:0 0 auto}
+.gitem[open] .gc{transform:rotate(90deg)}
+.gbody{padding:2px 20px 20px 61px;font-size:14px}
+.gbody ol{margin:0 0 12px;padding-left:19px}
+.gbody ol li{margin-bottom:7px;line-height:1.5}
+.gbody p{margin:0 0 11px;line-height:1.5}
+.gbody .tip{background:var(--blue-l);border-radius:9px;padding:11px 13px;font-size:13px;margin:11px 0}
+.gbody .tip b{color:var(--blue-d)}
+.gbody code{font-family:var(--mono);font-size:12.5px;background:#EEF3F8;padding:2px 6px;border-radius:5px}
+.gbody table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+.gbody th{background:var(--blue);color:#fff;text-align:left;padding:7px 9px;font-size:12px;font-weight:600}
+.gbody td{padding:7px 9px;border-bottom:1px solid var(--line-s);vertical-align:top}
+.gbody a.go2{display:inline-block;margin-top:4px;font-weight:700;font-size:13.5px;text-decoration:none}
+.firstrun{background:linear-gradient(135deg,var(--blue),var(--blue-d));color:#fff;border-radius:12px;
+  padding:15px 18px;margin-bottom:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.firstrun b{font-size:15px}
+.firstrun p{margin:2px 0 0;font-size:13px;opacity:.9}
+.firstrun a{margin-left:auto;background:#fff;color:var(--blue-d);text-decoration:none;font-weight:700;
+  font-size:13.5px;padding:9px 16px;border-radius:8px;white-space:nowrap}
+@media (max-width:760px){ .gbody{padding-left:20px} .firstrun a{margin-left:0}  .hero{grid-template-columns:1fr} .state{border-left:0;border-top:1px solid var(--line-s);padding:14px 0 0} }
+</style>
+</head>
+<body>
+
+<header class="ppo-top"><div class="ppo-top-in">
+  <div class="ppo-mark">ППО</div>
+  <div class="ppo-brand"><b>Рабочее место ППО ВОЛС</b><span>филиал ПАО «Россети Юг» — «Кубаньэнерго» · ДРНУ</span></div>
+  <nav id="ppoNav"></nav>
+</div></header>
+
+<div class="wrap">
+
+  <section class="hero">
+    <div>
+      <div class="eyebrow">Осмотр · измерения · отчёт по п. 13 Правил (ПП РФ № 2106)</div>
+      <h1>Всё, что нужно для обследования опор под размещение ВОЛС — на одной странице</h1>
+      <p>Главный формат данных — <b>ID_shablon.xlsx</b>. Раздел «Осмотр» заполняет его вместо вас
+         и читает обратно; формулы, справочники и выпадающие списки шаблона сохраняются.
+         Отчёт всегда собирается из этой книги.</p>
+    </div>
+    <div class="state" id="state"></div>
+  </section>
+
+  <div class="flow">
+    <b>1. Выезды</b><i>→</i><b>2. Обход в поле</b><i>→</i><b>3. Импорт KMZ</b><i>→</i><b>4. Измерения</b><i>→</i><b>5. Отчёт</b>
+    <span style="width:100%;margin-top:6px">Порядок необязательный: можно начать с любого шага, данные объединяются.</span>
+  </div>
+
+  <div class="firstrun">
+    <div><b>Первый раз здесь?</b><p>Ниже на этой странице — инструкция по шагам. Открывается прямо тут, скачивать ничего не нужно.</p></div>
+    <a href="#guide">Открыть инструкцию</a>
+  </div>
+
+  <div class="tiles">
+
+    <a class="tile" href="potok.html">
+      <div class="step">Сквозной прогон</div>
+      <h3>Импорт полевого обхода</h3>
+      <p>Загрузите KMZ с метками и фотографиями — программа разберёт подписи вида
+         «номер : марка : линия», сопоставит полевые сокращения с марками справочника,
+         посчитает пролёты по координатам, распознает дефекты и привяжет фотографии к опорам.
+         От файла обхода до готового отчёта — пять шагов.</p>
+      <span class="go">Загрузить KMZ →</span>
+    </a>
+
+    <a class="tile" href="osmotr.html">
+      <div class="step">Шаг 3 · основной ввод</div>
+      <h3>Осмотр объекта</h3>
+      <p>Паспорт объекта по подсказкам, карточки опор с категорией дефекта и фото, измерения
+         с автоматическим выводом «соответствует / не соответствует», приборы и кабели.
+         Всё сохраняется в браузере само.</p>
+      <span class="go">Открыть осмотр →</span>
+    </a>
+
+    <a class="tile" href="pribory.html">
+      <div class="step">Шаг 4 · полевые расчёты</div>
+      <h3>Измерительные инструменты</h3>
+      <p>Кренометр, высотомер, прочность бетона по ГОСТ 22690, трещиномер, сопротивление
+         заземления, дальномер по координатам, проверка компоновки ОКСН.
+         Каждый результат одной кнопкой уходит в измерения.</p>
+      <span class="go">Открыть инструменты →</span>
+    </a>
+
+    <a class="tile" href="karta.html">
+      <div class="step">Шаг 2 · привязка</div>
+      <h3>Карта и KMZ</h3>
+      <p>Загрузка KMZ/KML, сбор меток из фотографий с геолокацией, рисование трассы,
+         подложки Яндекс / Google / OSM. Метки переносятся в осмотр готовыми опорами
+         с номером, типом и координатами.</p>
+      <span class="go">Открыть карту →</span>
+    </a>
+
+    <a class="tile" href="index.html">
+      <div class="step">Шаг 5 · результат</div>
+      <h3>Генератор отчёта</h3>
+      <p>Собирает отчёт по подпунктам «а»–«д» пункта 13 Правил, прогоняет 18 автоматических
+         проверок и выгружает в PDF или Word. Данные всегда читаются из книги шаблона.</p>
+      <span class="go">Собрать отчёт →</span>
+    </a>
+
+    <a class="tile secondary" href="obyazatelstvo.html">
+      <div class="step">Шаг 0 · до передачи сведений</div>
+      <h3>Обязательство о конфиденциальности</h3>
+      <p>Форма письменного обязательства пользователя инфраструктуры о сохранении конфиденциальности
+         и неиспользовании информации в противоправных целях (пункт 15 Правил). Заполняется реквизитами
+         осмотра и печатается в ПДФ.</p>
+      <span class="go">Открыть форму →</span>
+    </a>
+
+    <a class="tile secondary" href="vyezdy.html">
+      <div class="step">Шаг 1 · подготовка</div>
+      <h3>Планирование выездов</h3>
+      <p>Группировка объектов по маршрутам, расчёт числа поездок и километража,
+         база выездов — Краснодар.</p>
+      <span class="go">Открыть планирование →</span>
+    </a>
+
+    <a class="tile secondary" href="spravochniki.html">
+      <div class="step">Настройка</div>
+      <h3>Справочники</h3>
+      <p>Свои марки опор, кабели ОК, провода ВЛ, приборы и значения списков выбора.
+         Записи появляются во всех формах комплекта; зашитые справочники копируются
+         для правки одной кнопкой.</p>
+      <span class="go">Открыть справочники →</span>
+    </a>
+
+    <a class="tile" href="ID_shablon.xlsx" download>
+      <div class="step">Главный формат</div>
+      <h3>Шаблон исходных данных</h3>
+      <p>Файл с формулами, справочниками и выпадающими списками. Можно заполнять напрямую в Excel,
+         а можно доверить форме осмотра — результат один и тот же файл.</p>
+      <span class="go">Скачать ID_shablon.xlsx ↓</span>
+    </a>
+
+  </div>
+
+
+  <div class="guide" id="guide">
+    <div class="gh">
+      <h2>Инструкция: как сделать отчёт</h2>
+      <p>Нажмите на шаг, чтобы раскрыть. Можно идти подряд сверху вниз.</p>
+    </div>
+
+    <details class="gitem" open>
+      <summary><div class="gn">?</div><div class="gt"><b>С чего начать — выберите свой путь</b>
+        <span>Результат у всех трёх одинаковый, разница только в объёме ручной работы</span></div><div class="gc">›</div></summary>
+      <div class="gbody">
+        <table>
+          <tr><th>Путь</th><th>Когда подходит</th><th>Время на 100 опор</th></tr>
+          <tr><td><b>Импорт KMZ</b></td><td>Обход снят с метками и фотографиями</td><td>15–20 минут</td></tr>
+          <tr><td><b>Форма «Осмотр»</b></td><td>Обхода в KMZ нет, данные на бумаге</td><td>1,5–2 часа</td></tr>
+          <tr><td><b>Таблица Excel</b></td><td>Привычнее работать в таблице</td><td>2–3 часа</td></tr>
+        </table>
+        <div class="tip"><b>Главное:</b> файл данных во всех случаях один — <code>ID_shablon.xlsx</code>.
+          Первые два пути заполняют его за вас, третий вы заполняете сами. Отчёт всегда собирается из него.</div>
+        <p><b>Что приготовить заранее:</b> реквизиты запроса оператора (номер, дата, входящий номер и дата
+          регистрации), наименование и место объекта, класс напряжения, сведения о приборах — марка,
+          заводской номер, запись о поверке во ФГИС «Аршин», дата окончания поверки.</p>
+      </div>
+    </details>
+
+    <details class="gitem">
+      <summary><div class="gn">1</div><div class="gt"><b>Импорт полевого обхода (KMZ)</b>
+        <span>Самый быстрый путь, если обход снят в Locus, OsmAnd или Google Earth</span></div><div class="gc">›</div></summary>
+      <div class="gbody">
+        <p><b>Как подписывать метки в поле</b> — единственное, что нужно делать аккуратно:</p>
+        <p><code>номер : марка : линия : примечание</code></p>
+        <table>
+          <tr><th>Подпись метки</th><th>Что распознается</th></tr>
+          <tr><td><code>104:П10-1:ВЛ 10 - Сщ-7</code></td><td>Опора 104, марка П10-1, линия ВЛ 10 Сщ-7</td></tr>
+          <tr><td><code>103: УА10-1</code></td><td>Линия та же, что у предыдущей метки</td></tr>
+          <tr><td><code>2-5:П3:ВЛ 0,4 №1 - 4:Отклонение от оси</code></td><td>Примечание даёт категорию дефекта Б</td></tr>
+          <tr><td><code>Б/С</code></td><td>Не номер — в опоры не попадёт, покажется отдельно</td></tr>
+        </table>
+        <p><b>Три правила, которые экономят время:</b></p>
+        <ol>
+          <li>Название линии пишите только там, где она меняется. Остальные опоры её унаследуют.</li>
+          <li>Класс напряжения отдельно не пишите — он берётся из названия линии.</li>
+          <li>Марку пишите полевым сокращением: П3, УА10-1, П10/0,38. К справочнику её приведёт программа.</li>
+        </ol>
+        <p>Дефекты отмечайте словами: «разрушение», «оголение арматуры» — категория A;
+          «отклонение», «наклон», «трещины» — Б; «скол», «загрязнение» — В.
+          Пролёты не измеряйте, они посчитаются по координатам.</p>
+        <p><b>Дальше на странице «Импорт KMZ»:</b></p>
+        <ol>
+          <li>Перетащите файл .kmz в рамку.</li>
+          <li>Проверьте таблицу соответствия марок. Строка — одно сокращение, а не одна опора; строк выходит полтора десятка. Жёлтые строки — марку подобрать не удалось, выберите сами.</li>
+          <li>Снимите галочки с линий, которые не входят в предмет отчёта.</li>
+          <li>Заполните реквизиты. Часть уже подставлена из файла — под такими полями это написано.</li>
+          <li>Нажмите «Перенести» и дождитесь полосы до конца. Сто фотографий переносятся 2–4 минуты.</li>
+        </ol>
+        <a class="go2" href="potok.html">Открыть импорт KMZ →</a>
+      </div>
+    </details>
+
+    <details class="gitem">
+      <summary><div class="gn">2</div><div class="gt"><b>Ввод вручную в разделе «Осмотр»</b>
+        <span>Шесть вкладок слева направо</span></div><div class="gc">›</div></summary>
+      <div class="gbody">
+        <ol>
+          <li><b>Объект.</b> Заполняйте сверху вниз. Красная точка у названия — без поля отчёт не выпустят.
+            Класс напряжения выбирается нажатием на кружки, можно несколько.
+            Габариты и охранная зона посчитаются сами и появятся в синем блоке наверху.</li>
+          <li><b>Опоры.</b> Если нумерация подряд — «Добавить пачкой»: укажите номера с и по, марку
+            и типовой пролёт, карточки создадутся все сразу. В карточке сначала выберите класс
+            напряжения, только потом станут доступны марки этого класса.
+            Цветная полоска слева показывает состояние: красная — аварийное, оранжевая — ограниченно
+            работоспособное.</li>
+          <li><b>Измерения.</b> Вводится только замеренное число — норматив и вывод считаются сами.
+            Цветная плашка сразу покажет «соответствует» или «не соответствует».</li>
+          <li><b>Приборы.</b> Обязательно запись о поверке во ФГИС «Аршин» и дата окончания.
+            Красная подсветка — поверка истекла, измерения таким прибором не принимаются.</li>
+          <li><b>Кабели.</b> Сверху — что размещает оператор. Снизу — что уже висит: провода ВЛ,
+            грозотрос, ранее размещённые кабели. Без нижнего блока оценка занизит нагрузку.</li>
+          <li><b>Проверка и выгрузка.</b> Кольцо показывает готовность. «Нужно исправить» — без этого
+            отчёт не выпустить; «Стоит проверить» — соберётся, но качество пострадает.</li>
+        </ol>
+        <a class="go2" href="osmotr.html">Открыть осмотр →</a>
+      </div>
+    </details>
+
+    <details class="gitem">
+      <summary><div class="gn">3</div><div class="gt"><b>Измерения полевыми калькуляторами</b>
+        <span>Десять инструментов, результат уходит в осмотр одной кнопкой</span></div><div class="gc">›</div></summary>
+      <div class="gbody">
+        <ol>
+          <li>Нажмите на строку инструмента — раскроется поле ввода.</li>
+          <li>Введите замеренное значение. Результат и вывод появятся сразу.</li>
+          <li>Отметьте опоры, к которым относится измерение. Можно выбрать сразу несколько —
+            галочками, целой линией, диапазоном номеров или кнопкой «Только с дефектами».
+            Значение запишется отдельной строкой на каждую опору.</li>
+          <li>«Записать в измерения» — результат попадёт в корзину внизу страницы.</li>
+          <li>Набрав всё, нажмите «Отправить в осмотр».</li>
+        </ol>
+        <div class="tip"><b>Что считают инструменты:</b> отклонение стойки от вертикали (в том числе
+          датчиком наклона телефона), высоту опоры, габарит через стрелу провеса, прочность бетона
+          с отбраковкой по ГОСТ 22690, ширину раскрытия трещин по экранному эталону, сопротивление
+          заземления с нормативом по грунту, пролёты по координатам сразу для всей линии, компоновку
+          ОКСН из пяти расстояний, запас несущей способности, свободные места на опоре.</div>
+        <p>Датчики телефона дают ориентировочную точность. Для отчёта пользуйтесь поверенным прибором,
+          а калькулятор берите для пересчёта и проверки.</p>
+        <a class="go2" href="pribory.html">Открыть инструменты →</a>
+      </div>
+    </details>
+
+    <details class="gitem">
+      <summary><div class="gn">4</div><div class="gt"><b>Сборка отчёта</b>
+        <span>Шесть кнопок по порядку</span></div><div class="gc">›</div></summary>
+      <div class="gbody">
+        <ol>
+          <li><b>Взять данные из осмотра</b> — если работали в форме или импортировали обход.</li>
+          <li><b>Загрузить файл исходных данных (.xlsx)</b> — если таблицу заполнял кто-то другой.</li>
+          <li><b>Фото дефектных опор</b> подставляются в приложение В сами при переходе из осмотра —
+            с номером опоры, линией и категорией дефекта в подписи.
+            Кнопка «Все фото из осмотра» добавит и остальные снимки.</li>
+          <li><b>Схема трассы → приложение А</b> — картинкой или ПДФ.</li>
+          <li>Посмотрите панель проверок: 18 автоматических проверок в пяти группах.</li>
+          <li>Выгрузите: «Сохранить в ПДФ» или «Выгрузить в Ворд».</li>
+        </ol>
+        <div class="tip"><b>При печати в ПДФ</b> включите в браузере печать фона (background graphics),
+          иначе не выведется цвет шапок таблиц.</div>
+        <a class="go2" href="index.html">Открыть генератор отчёта →</a>
+      </div>
+    </details>
+
+    <details class="gitem">
+      <summary><div class="gn">!</div><div class="gt"><b>Если что-то пошло не так</b>
+        <span>Частые ситуации и что с ними делать</span></div><div class="gc">›</div></summary>
+      <div class="gbody">
+        <table>
+          <tr><th>Что видите</th><th>Что делать</th></tr>
+          <tr><td>«Шаблон не найден рядом со страницей»</td><td>Страницы открыты с диска. Откройте рабочее место по обычной ссылке</td></tr>
+          <tr><td>Марка опоры не выбирается</td><td>Сначала выберите класс напряжения — список марок фильтруется по нему</td></tr>
+          <tr><td>Вывод по измерению не считается</td><td>Заполнены не все поля. Для габарита нужен ещё класс напряжения объекта</td></tr>
+          <tr><td>В отчёте пустой раздел 4</td><td>Не внесены измерения</td></tr>
+          <tr><td>Прибор подсвечен красным</td><td>Истекла поверка, измерения им в отчёт не принимаются</td></tr>
+          <tr><td>Пролёты не посчитались</td><td>У опор нет координат либо соседние опоры на разных линиях</td></tr>
+          <tr><td>Опора не появилась после импорта</td><td>Подпись метки начинается не с номера. Смотрите блок «Метки, не ставшие опорами» на вкладке «Осмотр» → «Опоры»</td></tr>
+          <tr><td>В отчёте пустая графа «Примечание»</td><td>Заполните описание дефекта на вкладке «Осмотр» → «Дефекты»</td></tr>
+          <tr><td>После восстановления копии нет фото</td><td>Копия сделана старой версией. Новая кнопка «Резервная копия» упаковывает снимки внутрь файла</td></tr>
+        </table>
+      </div>
+    </details>
+
+    <details class="gitem">
+      <summary><div class="gn">✓</div><div class="gt"><b>Что входит в отчёт, а что — в проект</b>
+        <span>Чтобы не взять на себя лишнего</span></div><div class="gc">›</div></summary>
+      <div class="gbody">
+        <p><b>Отчёт фиксирует:</b> результаты визуального осмотра с категорией состояния по
+          ГОСТ 31937-2024, инструментальные измерения, сведения о ранее размещённых элементах
+          сетей связи, сводный вывод о технологической возможности доступа.</p>
+        <p><b>В проектную документацию оператора:</b> поверочные расчёты нагрузок по ПУЭ-7
+          и СП 20.13330.2016, выбор марок кабеля и арматуры, точки и высоты подвеса, стрелы провеса,
+          технические решения по устранению дефектов. В отчёте это носит рекомендательный характер —
+          пункты 5.1 и 6 ТТ № 282р.</p>
+        <p style="margin-bottom:0"><a class="go2" href="Instrukciya_po_zapolneniyu.docx" download>Скачать полную инструкцию (Word) ↓</a></p>
+      </div>
+    </details>
+  </div>
+
+  <div class="card" style="margin-top:18px">
+    <div class="eyebrow">Сохранность данных</div>
+    <h2>Где лежат внесённые данные</h2>
+    <p class="sub">Страницы работают целиком в браузере. Ничего никуда не отправляется.</p>
+    <p style="font-size:13.5px;color:var(--muted);margin:0 0 14px">
+      Текстовые данные хранятся в памяти браузера этого устройства, фотографии — в его локальной базе.
+      Очистка истории браузера или режим «инкогнито» их удалят. Перед сдачей работы делайте резервную копию.</p>
+    <div class="btnrow">
+      <button class="btn ghost" onclick="PPO.exportJson()">Сохранить резервную копию</button>
+      <button class="btn ghost" onclick="document.getElementById('imp').click()">Загрузить резервную копию</button>
+      <input type="file" id="imp" accept=".json" hidden>
+      <button class="btn danger" onclick="wipe()">Начать новый объект</button>
+    </div>
+  </div>
+
+  <p style="font-size:12.5px;color:var(--muted);text-align:center;margin-top:24px">
+    Нормативная база: ПП РФ № 2106 · ПУЭ-7 гл. 2.5 и п. 2.4.89 · ТТ ПАО «Россети» № 282р ·
+    ГОСТ 31937-2024 · ГОСТ 22690-2015 · ПП РФ № 160 · ПТЭ (приказ Минэнерго № 1070)
+  </p>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="ppo-core.js?v=3.6.3"></script>
+<script src="ppo-refs.js?v=3.6.3"></script>
+<script>
+PPO.mountNav('portal.html');
+
+function toast(m,bad){ var t=document.getElementById('toast'); t.textContent=m;
+  t.className='toast on'+(bad?' bad':''); setTimeout(function(){t.className='toast';},2600); }
+
+function paintState(){
+  var d = PPO.load(), r = PPO.readiness(), pr = PPO.problems();
+  var stop = pr.filter(function(x){return x.lv==='stop';}).length;
+  var obj = d.pass['ОБЪЕКТ_НАИМ'] || '';
+  document.getElementById('state').innerHTML =
+    '<div class="ready" style="margin-bottom:12px">' +
+      '<div class="ring" style="--p:'+r.pct+'"><i>'+r.pct+'%</i></div>' +
+      '<div><div style="font-size:12px;color:var(--muted);font-weight:600">Готовность к отчёту</div>' +
+      '<div class="obj">'+(obj ? esc(obj) : '<span style="color:var(--muted);font-weight:500">объект не задан</span>')+'</div></div>' +
+    '</div>' +
+    row('Опор внесено', d.poles.length) +
+    row('Измерений', d.meas.length) +
+    row('Средств измерений', d.si.length) +
+    row('Замечаний, блокирующих выпуск', stop ? '<span class="tag bad">'+stop+'</span>' : '<span class="tag ok">нет</span>') +
+    (d.saved ? '<div class="row" style="margin-top:8px"><span>Сохранено</span><b>'+new Date(d.saved).toLocaleString('ru-RU')+'</b></div>' : '');
+}
+function row(k,v){ return '<div class="row"><span>'+k+'</span><b>'+v+'</b></div>'; }
+function esc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+
+document.getElementById('imp').onchange = function(e){
+  var f = e.target.files[0]; if (!f) return;
+  PPO.importJson(f).then(function(){ paintState(); toast('Резервная копия загружена'); })
+    .catch(function(err){ toast('Не удалось прочитать файл: '+err.message, true); });
+  e.target.value = '';
+};
+function wipe(){
+  if (!confirm('Все данные текущего объекта будут удалены из браузера.\nСначала сохраните резервную копию, если она нужна.\n\nПродолжить?')) return;
+  PPO.reset(); PPO.photoAll().then(function(list){ list.forEach(function(p){ PPO.photoDel(p.id); }); });
+  paintState(); toast('Начат новый объект');
+}
+paintState();
+</script>
+</body>
+</html>
